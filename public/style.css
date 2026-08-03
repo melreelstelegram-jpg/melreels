@@ -1,0 +1,1048 @@
+/* =================================================================
+   MELREELS PROFESSIONAL STREAMING UI - UNIFIED VERSION
+   ================================================================= */
+
+:root {
+  --main-red: #e50914;
+  --bg-black: #000000;
+  --card-bg: #181818;
+  --text-white: #ffffff;
+  --text-gray: #a3a3a3;
+  --price-green: #00ff41;
+  --nav-bg: rgba(10, 10, 10, 0.8);
+  --glass: rgba(255, 255, 255, 0.1);
+  --glass-border: rgba(255, 255, 255, 0.05);
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  background-color: var(--bg-black);
+  color: var(--text-white);
+  font-family: "Roboto", "Segoe UI", sans-serif;
+  margin: 0;
+  padding: 0;
+  padding-bottom: 100px; /* Espaço para a nav bar */
+  overflow-x: hidden; /* 🚀 Trocado de clip para hidden (Mais seguro para mobile) */
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* --- ANIMAÇÕES --- */
+.fade-in {
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* --- OVERLAY DE LOADING --- */
+.loader-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--bg-black);
+  display: flex; flex-direction: column;
+  justify-content: center; align-items: center;
+  z-index: 9999;
+}
+
+.spinner {
+  width: 50px; height: 50px;
+  border: 4px solid rgba(229, 9, 20, 0.3);
+  border-top: 4px solid var(--main-red);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin { 100% { transform: rotate(360deg); } }
+
+/* --- HEADER & TITULOS --- */
+header {
+  padding: 15px;
+  background: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 100%);
+  position: sticky;
+  top: 0;
+  z-index: 2000;
+}
+
+header h1 {
+  color: var(--main-red);
+  margin: 10px 0;
+  font-size: 24px;
+  letter-spacing: 4px;
+  font-weight: 900;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+/* --- PESQUISA GLASSMORPHISM --- */
+.search-container {
+  background: var(--glass);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border-radius: 12px;
+  padding: 12px 15px;
+  display: flex; align-items: center;
+  margin: 0 15px 10px;
+  border: 1px solid var(--glass-border);
+}
+
+.search-container input {
+  background: transparent; border: none; color: white;
+  width: 100%; margin-left: 10px; outline: none;
+}
+
+/* --- SECTION HEADERS --- */
+.section-header {
+  padding: 20px 15px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.section-header span:first-child {
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+
+.ver-tudo {
+  color: var(--main-red);
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.ver-tudo:active {
+  opacity: 0.6;
+  transform: scale(0.95);
+}
+
+.ver-tudo i {
+  font-size: 10px;
+}
+
+/* --- HERO SLIDER --- */
+.hero-slider {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  gap: 15px;
+  padding: 10px 15px;
+  scrollbar-width: none;
+}
+.hero-slider::-webkit-scrollbar { display: none; }
+
+.hero-item {
+  min-width: 88vw;
+  height: 450px;
+  border-radius: 16px;
+  background-size: cover;
+  background-position: center;
+  scroll-snap-align: center;
+  position: relative;
+}
+
+.hero-overlay {
+  position: absolute; bottom: 0;
+  width: 100%; height: 60%;
+  background: linear-gradient(to top, rgba(0,0,0,1), transparent);
+  display: flex; flex-direction: column;
+  justify-content: flex-end; padding: 25px;
+  text-align: center;
+}
+
+/* --- CARDS & RANKING (ESTILO NETFLIX) --- */
+.horizontal-scroll {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden; /* Evita vazamento vertical em iOS antigo */
+    gap: 12px;
+    padding: 10px 15px 25px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch; /* Scroll inercial em iOS <13 */
+    will-change: scroll-position; /* GPU hint para Android antigo */
+    -webkit-transform: translateZ(0); /* Corrige bug de clipping em Webkit antigo */
+}
+.horizontal-scroll::-webkit-scrollbar { display: none; }
+
+.card-mini {
+  min-width: 125px;
+  position: relative;
+}
+
+.card-mini img {
+  width: 125px; 
+  height: 185px; 
+  object-fit: cover;
+  object-position: center; /* Centraliza o corte */
+  border-radius: 8px;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.card-mini .rank-number {
+  position: absolute;
+  bottom: 30px;
+  left: -18px;
+  font-size: 85px;
+  font-weight: 900;
+  color: #000;
+  -webkit-text-stroke: 2px #666;
+  z-index: 10;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.card-mini .title {
+  font-size: 12px; font-weight: 600;
+  margin-top: 8px; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis;
+}
+
+.card-mini .price {
+  color: var(--price-green); font-size: 12px; font-weight: 800;
+}
+
+/* --- CATEGORIAS & GRIDS --- */
+#category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 15px;
+}
+
+.chip {
+  background: #222;
+  padding: 8px 18px;
+  border-radius: 20px;
+  font-size: 11px;
+  white-space: nowrap;
+  border: 1px solid #333;
+  margin-right: 8px;
+  display: inline-block;
+}
+
+.chip.active {
+  background: var(--main-red);
+  border-color: var(--main-red);
+  font-weight: bold;
+}
+
+/* --- MODAIS DE VIDRO --- */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 5000;
+  justify-content: center; align-items: center;
+}
+
+.modal-content {
+  background: rgba(20, 20, 20, 0.95);
+  padding: 30px;
+  border-radius: 24px;
+  width: 90%;
+  max-width: 380px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 25px 50px rgba(0,0,0,1);
+}
+
+/* --- NAVEGAÇÃO INFERIOR --- */
+/* 1. Aumenta a altura geral da barra para dar respiro aos botões */
+.bottom-nav {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background-color: #0a0a0a; /* Fundo escuro */
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    height: 75px; /* 🚀 AUMENTADO: Padrão costuma ser 60px. 75px dá uma área de toque perfeita */
+    padding-bottom: env(safe-area-inset-bottom); /* Proteção para iPhones sem botão home */
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+/* 2. Ajusta o espaçamento interno do botão */
+.nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px; /* 🚀 AUMENTADO: Espaço entre o ícone e o texto */
+    color: #666;
+    cursor: pointer;
+    flex: 1;
+    height: 100%;
+    transition: all 0.2s ease-in-out;
+}
+
+/* 3. Aumenta o tamanho dos ÍCONES */
+.nav-item i {
+    font-size: 24px; /* 🚀 AUMENTADO: O padrão é 18px ou 20px. 24px fica muito mais imponente */
+    transition: transform 0.2s ease;
+}
+
+/* 4. Aumenta e destaca o TEXTO */
+.nav-item span {
+    font-size: 11px; /* 🚀 AUMENTADO: Facilita muito a leitura no celular */
+    font-weight: 700; /* Deixa a fonte mais gordinha */
+    letter-spacing: 0.5px;
+}
+
+/* 5. O Efeito de quando está selecionado (Ativo) */
+.nav-item.active {
+    color: var(--main-red, #E50914); /* Usa a sua cor vermelha do Melreels */
+}
+
+.nav-item.active i {
+    transform: scale(1.15); /* 🚀 EFEITO PREMIUM: O ícone dá uma leve crescida quando clicado */
+}
+
+/* --- PLAYER DE VÍDEO --- */
+#video-player-container {
+  display: none; position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: #000; z-index: 99999;
+}
+
+#main-player { width: 100%; height: 100%; object-fit: contain; }
+
+.player-close-btn {
+  position: absolute; top: 20px; right: 20px;
+  background: rgba(255,255,255,0.2);
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: white; border: none; font-size: 20px; z-index: 100001;
+}
+
+/* --- CORREÇÃO MINHA LISTA / RESULTADO DE BUSCA --- */
+#mylist-grid, #search-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr); /* Dois por linha como na imagem */
+    gap: 15px;
+    padding: 15px;
+}
+
+.card-premium-list {
+    position: relative;
+    background: #111;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.card-premium-list img {
+    width: 100%;
+    height: 240px; /* Mais alto, igual um poster de cinema */
+    object-fit: cover;
+    display: block;
+}
+
+.card-premium-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: linear-gradient(to top, rgba(0,0,0,0.95) 20%, transparent);
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.premium-title {
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 10px;
+    line-height: 1.2;
+    text-shadow: 1px 1px 3px rgba(0,0,0,1);
+}
+
+.btn-premium-watch {
+    background: white;
+    color: black;
+    border: none;
+    padding: 10px;
+    border-radius: 8px;
+    font-weight: 900;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 100%;
+}
+
+.btn-buy-small {
+    background: rgba(255, 255, 255, 0.15);
+    border: none;
+    color: white;
+    font-size: 10px;
+    width: 100%;
+    padding: 8px;
+    border-radius: 6px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    margin-top: 5px;
+}
+
+/* --- DETALHES DO CONTEÚDO --- */
+#movie-details {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    min-height: 100vh;
+    background: var(--bg-black);
+    z-index: 4000; /* Fica acima de tudo, mas abaixo do player */
+    padding-bottom: 120px; 
+}
+
+.details-header {
+    position: absolute; /* Muda de fixed para absolute para rolar junto */
+    top: 0; 
+    width: 100%; 
+    display: flex;
+    justify-content: space-between; 
+    padding: 15px; 
+    z-index: 9999; /* Garante que os botões fiquem clicáveis */
+    pointer-events: none; /* Ignora cliques na barra transparente... */
+}
+
+.details-header button {
+    pointer-events: auto;
+}
+
+.btn-icon-circle {
+    background: rgba(0,0,0,0.7); 
+    color: white; 
+    border: none;
+    width: 45px; 
+    height: 45px; 
+    border-radius: 50%; 
+    backdrop-filter: blur(10px);
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+.details-banner {
+    width: 100%; height: 280px; background-size: cover; background-position: center;
+    mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 50%, transparent 100%);
+}
+
+.details-content { 
+    padding: 0 20px; 
+    position: relative; /* Importante para não bugar a rolagem */
+    margin-top: -30px; 
+}
+
+.details-mini-poster {
+    width: 110px; height: 160px; border-radius: 12px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.8); border: 2px solid #222;
+}
+
+.details-meta { 
+    display: flex; 
+    gap: 8px; 
+    align-items: center; 
+    margin-top: 10px; 
+    font-size: 12px; 
+    color: #ccc; 
+    flex-wrap: wrap; /* Não deixa quebrar o layout se tiver muito texto */
+}
+
+.badge-outline { border: 1px solid #777; padding: 3px 8px; border-radius: 4px; }
+.badge-red { background: var(--main-red); color: white; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
+
+.details-description { color: #ccc; line-height: 1.6; font-size: 14px; margin: 25px 0; }
+
+.details-actions { display: flex; flex-direction: column; gap: 12px; }
+
+.btn-preview {
+    background: #333; color: white; border: none; padding: 15px;
+    border-radius: 10px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: background 0.2s;
+}
+
+.btn-buy-now {
+    background: var(--main-red); color: white; border: none; padding: 15px;
+    border-radius: 10px; font-weight: 900; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 4px 15px rgba(229, 9, 20, 0.3);
+}
+
+.btn-preview:active, .btn-buy-now:active {
+    transform: scale(0.98);
+    opacity: 0.9;
+}
+
+/* --- UTILITÁRIOS --- */
+.container { display: none; }
+.container.active { display: block; }
+
+.top12-grid {
+    display: grid;
+    grid-template-rows: repeat(3, 1fr);
+    grid-auto-flow: column;
+    grid-auto-columns: min(calc(50vw - 15px), 270px); /* Correção dinâmica para não vazar a tela */
+    gap: 15px 10px;
+    padding: 0 15px 20px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    will-change: scroll-position;
+    -webkit-transform: translateZ(0);
+    scroll-snap-type: x mandatory;
+}
+
+.top12-grid::-webkit-scrollbar { 
+    display: none; 
+}
+
+/* Faz com que cada bloco pare certinho na tela ao rolar */
+.card-top12 {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: transparent;
+    overflow: hidden;
+    scroll-snap-align: start; 
+}
+
+.card-top12-img-container {
+    position: relative; /* ISSO MANTÉM O NÚMERO DENTRO DA IMAGEM */
+    width: 75px;
+    min-width: 75px;
+    height: 105px;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+}
+
+.card-top12-img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+	object-position: center;
+}
+
+/* A fitinha do Ranking */
+.top12-badge {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 25px;
+    height: 25px;
+    color: white;
+    font-size: 14px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-top-right-radius: 8px;
+    z-index: 5;
+}
+
+/* Cores do Pódio */
+.top12-badge.rank-1 { background: linear-gradient(135deg, #f1c40f, #f39c12); color: #000; text-shadow: none; }
+.top12-badge.rank-2 { background: linear-gradient(135deg, #bdc3c7, #95a5a6); color: #000; text-shadow: none; }
+.top12-badge.rank-3 { background: linear-gradient(135deg, #e67e22, #d35400); text-shadow: none; }
+.top12-badge.rank-other { background: var(--main-red); }
+
+.card-top12-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+}
+
+.card-top12-title {
+    font-size: 11px;
+    font-weight: bold;
+    color: white;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* Corta o título com "..." se for muito grande */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.2;
+    margin-bottom: 4px;
+}
+
+.card-top12-price {
+    font-size: 11px;
+    font-weight: 800;
+    color: #ccc;
+    margin-bottom: 8px;
+}
+
+/* Botão de Comprar Branco Pílula (Igual a referência) */
+.btn-top12-buy {
+    background: white;
+    color: black;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 10px;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    cursor: pointer;
+    width: fit-content;
+}
+
+.btn-top12-buy i {
+    font-size: 11px;
+}
+
+/* ==================================================
+   MODO VIP PREMIUM (DOURADO)
+   ================================================== */
+/* Muda a cor da Logo para Dourado Neon */
+body.vip-mode header h1 {
+    color: #FFD700;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+}
+
+/* Muda a cor do ícone selecionado na barra de navegação para Dourado */
+body.vip-mode .nav-item.active i {
+    color: #FFD700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+body.vip-mode .nav-item.active span {
+    color: #FFD700;
+    font-weight: 900;
+}
+
+/* Cartão VIP (Exibido na Aba Premium) */
+.vip-card {
+    background: linear-gradient(135deg, #FFD700 0%, #B8860B 100%);
+    color: #000;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 25px;
+    text-align: left;
+    box-shadow: 0 8px 25px rgba(255, 215, 0, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Um diamante gigante transparente no fundo do cartão */
+.vip-card::after {
+    content: '\f3a5'; /* Ícone de Diamante do FontAwesome */
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    position: absolute;
+    right: -15px;
+    bottom: -25px;
+    font-size: 120px;
+    color: rgba(255,255,255,0.25);
+    pointer-events: none;
+}
+
+.vip-card-title {
+    font-size: 22px;
+    font-weight: 900;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.vip-card-date {
+    font-size: 14px;
+    font-weight: 800;
+    color: rgba(0,0,0,0.7);
+    margin-bottom: 10px;
+}
+
+/* ==================================================
+   CONTINUAR ASSISTINDO CARD
+   ================================================== */
+.card-continue {
+    min-width: 140px;
+    max-width: 140px;
+    background: #151515;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.05);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.6);
+}
+
+.card-continue img {
+    width: 100%;
+    height: 190px;
+    object-fit: cover;
+    display: block;
+}
+
+.continue-info {
+    padding: 10px;
+}
+
+.continue-info .title {
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.continue-info .ep-info {
+    font-size: 10px;
+    color: #888;
+    margin-top: 4px;
+}
+
+.progress-bg {
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.15);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--main-red);
+    border-radius: 2px;
+}
+
+/* ==================================================
+   PAGINAÇÃO (VER TUDO)
+   ================================================== */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 25px 15px 40px; /* Dá um respiro embaixo pro scroll */
+    flex-wrap: wrap; /* Se tiver muitas páginas, ele joga pra linha de baixo */
+}
+
+.page-btn {
+    background: #181818;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+}
+
+.page-btn:active {
+    transform: scale(0.95);
+}
+
+/* A página que o usuário está atualmente */
+.page-btn.active {
+    background: rgba(229, 9, 20, 0.2); /* Um fundo levemente avermelhado */
+    border-color: var(--main-red);
+    color: var(--main-red);
+}
+
+/* ==================================================
+   BOLHA DE NOTIFICAÇÃO (MINHA LISTA)
+   ================================================== */
+
+.nav-badge {
+    position: absolute;
+    top: 5px;
+    right: 15%;
+    background: var(--price-green); /* Verde chama muita atenção pro sucesso */
+    color: black;
+    font-size: 10px;
+    font-weight: 900;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 8px rgba(0, 255, 65, 0.4);
+    animation: popAndPulse 1.5s infinite;
+}
+
+/* Animação que faz a bolha nascer e ficar "respirando" chamando o clique */
+@keyframes popAndPulse {
+    0% { transform: scale(0); }
+    20% { transform: scale(1.2); }
+    50% { transform: scale(1); }
+    80% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.loading-shimmer {
+    background: linear-gradient(90deg, #181818 25%, #222 50%, #181818 75%);
+    background-size: 200% 100%;
+    animation: loading-results 1.5s infinite;
+    width: 100%;
+    height: 240px;
+    border-radius: 12px;
+}
+
+@keyframes loading-results {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* --- OVERLAY DE UPSELL PÓS-FILME --- */
+.upsell-player-overlay {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(5, 2, 8, 0.95);
+  z-index: 100000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.4s ease-in-out;
+}
+
+.upsell-player-content {
+  text-align: center;
+  max-width: 90%;
+  padding: 30px;
+  background: linear-gradient(135deg, rgba(20, 10, 30, 0.95), rgba(10, 5, 20, 0.95));
+  border: 2px solid rgba(229, 9, 20, 0.3);
+  box-shadow: 0 10px 30px rgba(229, 9, 20, 0.2);
+  border-radius: 20px;
+  color: white;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.upsell-badge-promo {
+  display: inline-block;
+  background: linear-gradient(90deg, #ffd700, #ff8c00);
+  color: black;
+  font-weight: 900;
+  font-size: 11px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 15px;
+  letter-spacing: 1px;
+  animation: pulseGold 2s infinite;
+}
+
+@keyframes pulseGold {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4); }
+  70% { transform: scale(1.05); box-shadow: 0 0 0 10px rgba(255, 215, 0, 0); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+}
+
+.upsell-player-content h2 {
+  font-size: 24px;
+  font-weight: 900;
+  margin: 10px 0;
+  background: linear-gradient(to right, #ffffff, #e50914);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.upsell-player-content p {
+  font-size: 14px;
+  color: #ccc;
+  margin-bottom: 25px;
+  line-height: 1.5;
+}
+
+.upsell-player-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.btn-upsell-pay {
+  background: linear-gradient(90deg, #e50914, #ff8c00);
+  color: white;
+  border: none;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(229, 9, 20, 0.4);
+  transition: all 0.3s ease;
+  animation: buttonPulse 1.5s infinite alternate;
+}
+
+@keyframes buttonPulse {
+  0% { box-shadow: 0 0 5px rgba(229, 9, 20, 0.4); }
+  100% { box-shadow: 0 0 20px rgba(229, 9, 20, 0.8), 0 0 30px rgba(255, 140, 0, 0.5); }
+}
+
+.btn-upsell-close {
+  background: rgba(255, 255, 255, 0.1);
+  color: #bbb;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.btn-upsell-close:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* --- BANNER FLUTUANTE DE UPSELL --- */
+.floating-upsell-banner {
+  position: fixed;
+  bottom: 85px;
+  left: 15px;
+  right: 15px;
+  background: linear-gradient(135deg, #ffd700, #4b0082);
+  border-radius: 15px;
+  padding: 15px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 215, 0, 0.2);
+  z-index: 9999;
+  animation: slideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(150%); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.floating-upsell-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: white;
+}
+
+.floating-upsell-content .title {
+  font-size: 14px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.floating-upsell-content .desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.btn-floating-upsell {
+  background: #000;
+  color: #ffd700;
+  border: 2px solid #ffd700;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  cursor: pointer;
+  animation: flashYellow 1s infinite alternate;
+}
+
+@keyframes flashYellow {
+  0% { transform: scale(1); box-shadow: 0 0 2px #ffd700; }
+  100% { transform: scale(1.05); box-shadow: 0 0 12px #ffd700; }
+}
+
+.close-floating-upsell {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 18px;
+  cursor: pointer;
+  margin-left: 10px;
+  padding: 0 5px;
+}
+
+/* --- PROMO BADGE NO MODAL DE PAGAMENTO --- */
+.payment-promo-badge {
+  background: linear-gradient(90deg, #e50914, #ff8c00);
+  color: white;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-weight: 900;
+  font-size: 12px;
+  margin-bottom: 15px;
+  letter-spacing: 0.5px;
+  animation: badgeBlink 1s infinite alternate;
+}
+
+@keyframes badgeBlink {
+  0% { opacity: 0.8; transform: scale(0.98); }
+  100% { opacity: 1; transform: scale(1.02); }
+}
+
+/* --- BADGES E HIGHLIGHTS DE PROMOÇÃO NOS CARDS --- */
+.card-promo-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, #e50914, #ff8c00);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 10px rgba(229, 9, 20, 0.3);
+  animation: pulsePromo 1.5s infinite alternate;
+}
+
+@keyframes pulsePromo {
+  0% { transform: translateX(-50%) scale(0.95); }
+  100% { transform: translateX(-50%) scale(1.05); }
+}
+
+.promo-price-highlight {
+  color: #ffd700;
+  font-weight: 900;
+  animation: pulseGoldText 1s infinite alternate;
+}
+
+@keyframes pulseGoldText {
+  from { text-shadow: 0 0 2px rgba(255, 215, 0, 0.5); }
+  to { text-shadow: 0 0 10px rgba(255, 215, 0, 0.9); }
+}

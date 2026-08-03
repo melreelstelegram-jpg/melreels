@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Melreels</title>
+    <!-- Scripts Externos -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="style.css?v=1.1" />
+</head>
+<body>
+
+    <!-- Overlay de Loading -->
+    <div id="app-loader" class="loader-overlay">
+        <div class="spinner"></div>
+        <p>Carregando catálogo...</p>
+    </div>
+
+    <!-- Cabeçalho Fixo -->
+    <header>
+        <div class="search-container">
+            <i class="fas fa-search"></i>
+            <input type="text" id="search-input" placeholder="Pesquisar dramas, filmes..." onkeyup="filterCatalog()" />
+            <i class="fas fa-times-circle clear-search" id="clear-search" onclick="clearSearch()" style="display: none; cursor: pointer"></i>
+        </div>
+        <h1>MELREELS</h1>
+    </header>
+
+    <!-- Página Inicial (Home) -->
+    <main id="home" class="container active fade-in">
+        <div style="position: relative">
+            <div class="hero-slider" id="hero-slider"></div>
+            <div class="slider-dots" id="slider-dots"></div>
+        </div>
+
+        <div class="section-header">
+            <span>TOP 12 <i class="fas fa-fire" style="color: var(--main-red); margin-left: 5px"></i></span>
+            <div class="nav-arrows">
+                <i class="fas fa-chevron-left"></i>
+                <i class="fas fa-chevron-right"></i>
+            </div>
+        </div>
+        <div class="horizontal-scroll" id="top-12-row"></div>
+
+        <div class="section-header">
+            <span>Lançamentos</span> <i class="fas fa-chevron-right"></i>
+        </div>
+        <div class="horizontal-scroll" id="lancamentos-row"></div>
+
+        <div class="section-header">
+            <span>Reels</span> <i class="fas fa-chevron-right"></i>
+        </div>
+        <div class="horizontal-scroll" id="reels-row"></div>
+
+        <div class="section-header">
+            <span>Animes & Curtas IA</span> <i class="fas fa-chevron-right"></i>
+        </div>
+        <div class="horizontal-scroll" id="ia-row"></div>
+    </main>
+
+    <!-- Minha Lista -->
+    <main id="mylist" class="container fade-in">
+        <div class="section-title" style="padding: 15px; font-weight: bold; font-size: 18px">
+            Meus Conteúdos
+        </div>
+        <div id="mylist-grid" class="grid"></div>
+        <div id="mylist-empty" class="empty-state" style="display: none; text-align: center; margin-top: 50px; color: var(--text-gray);">
+            <i class="fas fa-box-open" style="font-size: 40px; margin-bottom: 10px"></i><br />
+            Sua lista está vazia.
+        </div>
+    </main>
+
+    <!-- Assinaturas Premium -->
+    <main id="bestsellers" class="container fade-in">
+        <div class="section-title" style="padding: 15px; font-weight: bold; font-size: 18px; text-align: center;">
+            Assinaturas Premium
+        </div>
+        <div id="bestsellers-grid" class="grid"></div>
+    </main>
+	
+    <!-- Detalhes do Filme/Série -->
+    <main id="movie-details" class="container fade-in" style="display: none; padding-bottom: 30px;">
+        <div class="details-header">
+            <button onclick="backToHome()" class="btn-icon-circle"><i class="fas fa-arrow-left"></i></button>
+            <button id="btn-share" class="btn-icon-circle"><i class="fas fa-share-alt"></i></button>
+        </div>
+
+        <div class="details-banner" id="details-banner"></div>
+        
+        <div class="details-content">
+            <div style="display: flex; gap: 15px; margin-top: -60px; position: relative; z-index: 5;">
+                <img id="details-poster" src="" class="details-mini-poster">
+                <div style="padding-top: 65px;">
+                    <h2 id="details-title" style="margin: 0; font-size: 20px;"></h2>
+                    <div class="details-meta">
+                        <span id="details-year"></span>
+                        <span id="details-duration" class="badge-outline"></span>
+                        <span id="details-format" class="badge-red"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="details-tags" id="details-tags"></div>
+            <p id="details-synopsis" class="details-description"></p>
+			
+			<div id="episodes-container" style="display: none; margin: 25px 0;">
+    <h3 style="color: white; font-size: 16px; margin-bottom: 15px; font-weight: 900; letter-spacing: 1px;">EPISÓDIOS</h3>
+    <div id="episodes-list" style="display: flex; flex-direction: column; gap: 10px;">
+        </div>
+</div>
+
+            <div class="details-actions">
+                <button id="btn-preview" class="btn-preview">
+                    <i class="fas fa-play"></i> ASSISTIR PRÉVIA
+                </button>
+                <button id="btn-main-buy" class="btn-buy-now">
+                    <i class="fas fa-shopping-cart"></i> COMPRAR AGORA
+                </button>
+            </div>
+        </div>
+    </main>
+	
+    <!-- Página de Categorias / Grid Geral -->
+    <main id="category-page" class="container fade-in" style="display: none;">
+        <div class="category-nav" style="padding: 15px; display: flex; align-items: center; gap: 15px;">
+            <button onclick="switchTab('home')" style="background: none; border: none; color: white; font-size: 20px;">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <h2 id="category-page-title" style="margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px;">Catálogo</h2>
+        </div>
+
+        <div class="filter-chips" style="display: flex; overflow-x: auto; gap: 10px; padding: 0 15px 15px; scrollbar-width: none;">
+            <div class="chip active" onclick="filterCategoryPage('TODOS')">Tudo</div>
+            <div class="chip" onclick="filterCategoryPage('Filme')">Filmes</div>
+            <div class="chip" onclick="filterCategoryPage('Série')">Séries</div>
+            <div class="chip" onclick="filterCategoryPage('Dorama')">Doramas</div>
+            <div class="chip" onclick="filterCategoryPage('Short')">Shorts</div>
+        </div>
+
+        <div id="category-grid" class="grid" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; padding: 0 10px;"></div>
+		<div id="pagination-container" class="pagination"></div>
+    </main>
+
+    <!-- Modal de Seleção de Compra (Vitalício vs Aluguel) -->
+    <div id="custom-buy-modal" class="modal-overlay">
+        <div class="modal-content fade-in">
+            <h2 id="buy-modal-title" style="margin-bottom: 5px;">Escolha o Acesso</h2>
+            <p id="buy-modal-desc" style="color: var(--text-gray); font-size: 13px; margin-bottom: 20px;">
+                Como deseja acessar este conteúdo?
+            </p>
+            <button id="btn-buy-vitalicio" class="btn-vitalicio" style="width: 100%; padding: 14px; background: var(--main-red); color: white; border: none; border-radius: 8px; font-weight: 900; margin-bottom: 10px; cursor: pointer;">
+                VITALÍCIO: R$ 0,00
+            </button>
+            <button id="btn-buy-aluguel" class="btn-aluguel" style="width: 100%; padding: 14px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer;">
+                ALUGAR (7 DIAS): R$ 0,00
+            </button>
+            <button onclick="fecharModalCompra()" class="btn-close" style="width: 100%; padding: 12px; background: transparent; color: var(--text-gray); border: none; font-weight: bold; cursor: pointer;">
+                CANCELAR
+            </button>
+        </div>
+    </div>
+
+    <!-- Modal de Pagamento PIX (Trazido da segunda versão) -->
+    <div id="payment-modal" class="modal-overlay">
+        <div class="modal-content fade-in" style="background: #111; color: #fff; border: 1px solid rgba(255,255,255,0.1);">
+            
+            <div id="qr-code-section">
+                <!-- Badge Promocional do Upsell -->
+                <div id="payment-promo-badge" class="payment-promo-badge" style="display: none;">
+                    🔥 PROMOÇÃO 1º MÊS POR R$ 20,00!
+                </div>
+                <h2 id="modal-title" style="margin-bottom: 5px; color: #fff; font-size: 18px;">Finalizar Pagamento</h2>
+                <div id="modal-price" style="font-size: 24px; font-weight: 900; color: var(--price-green); margin-bottom: 15px;"></div>
+                
+                <div style="background: white; padding: 10px; border-radius: 10px; width: fit-content; margin: 0 auto 15px;">
+                    <img id="qr-code-img" src="" style="width: 200px; height: 200px; display: block;">
+                </div>
+                
+                <p style="font-size: 12px; color: #aaa; margin-bottom: 15px;">Escaneie o QR Code ou clique no botão abaixo para copiar a chave Pix.</p>
+                
+                <button onclick="copyPixCode()" style="width: 100%; padding: 14px; background: var(--price-green); color: black; border: none; border-radius: 8px; font-weight: 900; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fas fa-copy"></i> COPIAR PIX COPIA E COLA
+                </button>
+                
+                <button onclick="closePaymentModal()" style="width: 100%; padding: 12px; background: transparent; color: #999; border: none; font-weight: bold; cursor: pointer;">
+                    CANCELAR
+                </button>
+            </div>
+
+            <div id="success-section" style="display: none; text-align: center; padding: 20px 0;">
+                <i class="fas fa-check-circle" style="font-size: 70px; color: var(--price-green); margin-bottom: 15px;"></i>
+                <h2 style="color: white; margin-bottom: 10px;">Pagamento Confirmado!</h2>
+                <p style="color: #aaa; font-size: 14px; margin-bottom: 25px;">Tudo certo! Seu conteúdo premium já está liberado para assistir.</p>
+                <button onclick="irParaMinhaLista()" style="width: 100%; padding: 14px; background: var(--main-red); color: white; border: none; border-radius: 8px; font-weight: 900; cursor: pointer;">
+                    <i class="fas fa-play"></i> ASSISTIR AGORA
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Player de Vídeo -->
+    <div id="video-player-container">
+        <button onclick="closePlayer()" class="player-close-btn">&times;</button>
+        <video id="main-player" controls controlsList="nodownload" playsinline oncontextmenu="return false;">
+            <source id="video-source" src="" type="video/mp4" />
+        </video>
+        <!-- Overlay de Upsell Pós-Filme -->
+        <div id="upsell-pos-filme" class="upsell-player-overlay" style="display: none;">
+            <div class="upsell-player-content">
+                <div class="upsell-badge-promo">ACESSO ILIMITADO</div>
+                <h2>🍿 Gostou de assistir?</h2>
+                <p>Assista a <b>todas as séries, doramas e filmes</b> sem limites com nossos planos premium!</p>
+                <div class="upsell-player-actions">
+                    <button onclick="assinarViaUpsell()" class="btn-upsell-pay">👑 CONHECER PLANOS PREMIUM</button>
+                    <button onclick="fecharUpsellPosFilme()" class="btn-upsell-close">Fechar e Voltar</button>
+                </div>
+            </div>
+        </div>
+        <div id="player-info">
+            <h2 id="player-title">Título do Filme</h2>
+            <p style="color: #e50914; font-size: 12px; font-weight: bold; letter-spacing: 2px;">
+                MELREELS PREMIUM
+            </p>
+        </div>
+    </div>
+
+    <!-- Banner Flutuante de Upsell -->
+    <div id="floating-upsell-banner" class="floating-upsell-banner" style="display: none;">
+        <div class="floating-upsell-content">
+            <span class="title">🔓 Acesso Ilimitado</span>
+            <span class="desc">Assista a todas as séries, doramas e filmes!</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+            <button class="btn-floating-upsell" onclick="irParaPlanosUpsell()">Assinar Plano Premium</button>
+            <button class="close-floating-upsell" onclick="fecharBannerFlutuanteUpsell()">&times;</button>
+        </div>
+    </div>
+
+    <!-- Barra de Navegação Inferior -->
+    <nav class="bottom-nav">
+        <div class="nav-item active" id="nav-home" onclick="switchTab('home')">
+            <i class="fas fa-house"></i><span>HOME</span>
+        </div>
+        <div class="nav-item" id="nav-mylist" onclick="switchTab('mylist')">
+            <i class="fas fa-folder-open"></i><span>MINHA LISTA</span>
+        </div>
+        <div class="nav-item" id="nav-bestsellers" onclick="switchTab('bestsellers')">
+            <i class="fas fa-fire"></i><span>PREMIUM</span>
+        </div>
+        <div class="nav-item" onclick="openSupport()">
+            <i class="fas fa-headset"></i><span>SUPORTE</span>
+        </div>
+    </nav>
+
+	<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="script.js?v=1.1"></script>
+</body>
+</html>
