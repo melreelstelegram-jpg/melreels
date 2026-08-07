@@ -577,7 +577,10 @@ const gerenciarClienteScene = new Scenes.WizardScene(
   
   // Passo 3: O Cérebro das Ações
   async (ctx) => {
-    if (!ctx.callbackQuery) return;
+    if (!ctx.callbackQuery) {
+        await ctx.reply("⚠️ Ação inválida ou expirada. Envie /admin para começar de novo.");
+        return ctx.scene.leave();
+    }
     const acao = ctx.callbackQuery.data;
     const userId = ctx.wizard.state.clienteId;
     await ctx.answerCbQuery().catch(() => {});
@@ -730,14 +733,21 @@ const gerenciarClienteScene = new Scenes.WizardScene(
     const subAcao = ctx.wizard.state.subAcao;
 
     if (subAcao === "DAR_PLANO") {
-        if (!ctx.callbackQuery) return;
+        if (!ctx.callbackQuery) {
+            await ctx.reply("⚠️ Ação inválida ou expirada. Envie /admin para começar de novo.");
+            return ctx.scene.leave();
+        }
         if (ctx.callbackQuery.data === "CANCELAR_GERENCIAMENTO") {
             await ctx.answerCbQuery().catch(()=>{});
             await ctx.editMessageText("❌ Operação cancelada.");
             return ctx.scene.leave();
         }
-        if (!ctx.callbackQuery.data.startsWith("PLANO_")) return;
-        
+        if (!ctx.callbackQuery.data.startsWith("PLANO_")) {
+            await ctx.answerCbQuery().catch(()=>{});
+            await ctx.reply("⚠️ Ação inválida ou expirada. Envie /admin para começar de novo.");
+            return ctx.scene.leave();
+        }
+
         const planId = ctx.callbackQuery.data.replace("PLANO_", "");
         ctx.wizard.state.planId = planId;
         await ctx.answerCbQuery().catch(()=>{});
@@ -849,7 +859,10 @@ const gerenciarClienteScene = new Scenes.WizardScene(
     }
 
     // Lógica original de Inserir Filme
-    if (!ctx.callbackQuery) return; // Escudo pro filme avulso
+    if (!ctx.callbackQuery) {
+        await ctx.reply("⚠️ Ação inválida ou expirada. Envie /admin para começar de novo.");
+        return ctx.scene.leave();
+    }
     const data = ctx.callbackQuery.data;
     await ctx.answerCbQuery().catch(()=>{});
 
@@ -979,7 +992,10 @@ const atualizarFilmeScene = new Scenes.WizardScene(
 
   // Passo 3: Identificar o campo escolhido
   async (ctx) => {
-    if (!ctx.callbackQuery) return;
+    if (!ctx.callbackQuery) {
+        await ctx.reply("⚠️ Ação inválida ou expirada. Envie /admin para começar de novo.");
+        return ctx.scene.leave();
+    }
     const data = ctx.callbackQuery.data;
     await ctx.answerCbQuery();
 
@@ -1400,7 +1416,10 @@ const editarNomeCategoriaPlanoScene = new Scenes.WizardScene(
 
   // Passo 3: Pedir o Novo Valor
   async (ctx) => {
-    if (!ctx.callbackQuery) return;
+    if (!ctx.callbackQuery) {
+        await ctx.reply("⚠️ Ação inválida ou expirada. Envie /admin para começar de novo.");
+        return ctx.scene.leave();
+    }
     const data = ctx.callbackQuery.data;
     await ctx.answerCbQuery();
 
