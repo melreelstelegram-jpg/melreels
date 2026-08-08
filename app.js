@@ -1,4 +1,5 @@
 import axios from "axios"; // ADICIONADO: Faltava o import para a rota stream-video
+import { createHash } from "crypto";
 import cors from "cors";
 import "dotenv/config";
 import express from "express";
@@ -25,7 +26,11 @@ bot.catch((err, ctx) => {
 // container antigo e o novo podem disputar o getUpdates (erro 409 Conflict) e o
 // bot fica sem processar comandos até o retry. Webhook elimina essa classe de travamento.
 const PUBLIC_DOMAIN = process.env.PUBLIC_URL || "https://melreels.com.br";
-const BOT_WEBHOOK_PATH = `/telegraf-webhook/${process.env.BOT_TOKEN}`;
+// Usa um hash do token (sem ":") em vez do token cru — o ":" dentro de um path
+// de URL é atípico o bastante pra causar problemas em alguns parsers de URL
+// do lado do Telegram ao registrar/entregar o webhook.
+const BOT_WEBHOOK_SECRET = createHash("sha256").update(process.env.BOT_TOKEN).digest("hex");
+const BOT_WEBHOOK_PATH = `/telegraf-webhook/${BOT_WEBHOOK_SECRET}`;
 
 // =================================================================
 // 0. CACHE EM MEMÓRIA (PERFORMANCE)
