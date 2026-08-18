@@ -21,4 +21,10 @@ const pool = new Pool({
   ssl: isLocalDb ? false : { rejectUnauthorized: false },
 });
 
+// Sem isso, um erro numa conexão ociosa do pool (ex: soluço de rede com o Postgres)
+// vira uma uncaughtException e derruba o processo inteiro (bot + API juntos).
+pool.on("error", (err) => {
+  console.error("🔥 [DB POOL] Erro numa conexão ociosa:", err.message);
+});
+
 export default pool;

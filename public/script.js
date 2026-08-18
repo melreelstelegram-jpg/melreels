@@ -864,11 +864,17 @@ async function processarCompra(id, titulo, modalidade, valorFinal) {
 
               if (dataPoll.approved) {
     clearInterval(paymentPollingInterval);
-    
+
+    // 🚀 Atualiza o status VIP e a lista do cliente AGORA, sem precisar fechar o app.
+    // Sem isso, userStatusData.isVip continuava desatualizado e o catálogo
+    // seguia bloqueado até o Telegram ser reaberto do zero.
+    await fetchUserStatus();
+    loadMyList();
+
     // Atualiza as telas do modal
     document.getElementById("qr-code-section").style.display = "none";
     document.getElementById("success-section").style.display = "block";
-    
+
     // 🚀 AQUI ENTRA A MUDANÇA DO SINO DE NOTIFICAÇÃO:
     // Cria uma bolha com o número "1" em cima do ícone "Minha Lista"
     const navMyList = document.getElementById("nav-mylist");
