@@ -1,5 +1,5 @@
 import axios from "axios"; // ADICIONADO: Faltava o import para a rota stream-video
-import { exec } from "child_process";
+import { createHash } from "crypto";
 import cors from "cors";
 import "dotenv/config";
 import express from "express";
@@ -20,6 +20,17 @@ const bot = new Telegraf(process.env.BOT_TOKEN, {
 bot.catch((err, ctx) => {
   console.error(`[BOT ERROR] Erro silencioso processando atualização para o user ${ctx.from?.id}:`, err.message);
 });
+
+// Domínio público onde o Telegram deve entregar as atualizações via webhook.
+// Long polling (bot.launch()) é frágil em PaaS como o Railway: a cada deploy o
+// container antigo e o novo podem disputar o getUpdates (erro 409 Conflict) e o
+// bot fica sem processar comandos até o retry. Webhook elimina essa classe de travamento.
+const PUBLIC_DOMAIN = process.env.PUBLIC_URL || "https://melreels.com.br";
+// Usa um hash do token (sem ":") em vez do token cru — o ":" dentro de um path
+// de URL é atípico o bastante pra causar problemas em alguns parsers de URL
+// do lado do Telegram ao registrar/entregar o webhook.
+const BOT_WEBHOOK_SECRET = createHash("sha256").update(process.env.BOT_TOKEN).digest("hex");
+const BOT_WEBHOOK_PATH = `/telegraf-webhook/${BOT_WEBHOOK_SECRET}`;
 
 // =================================================================
 // 0. CACHE EM MEMÓRIA (PERFORMANCE)
@@ -1654,6 +1665,10 @@ const transmitirAvisoScene = new Scenes.WizardScene(
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Rota do webhook do Telegram — substitui bot.launch() (long polling)
+app.use(bot.webhookCallback(BOT_WEBHOOK_PATH));
+
 app.use(express.static("public", {
   setHeaders: function (res, path) {
     res.set("Cache-Control", "no-cache, no-store, must-revalidate");
@@ -3277,15 +3292,9 @@ bot.action("ADMIN_RESTART_PM2", async (ctx) => {
     // 2. Avisa que vai cair (Isso tem que ser ANTES de rodar o comando, senão ele morre e não manda)
     await ctx.editMessageText("🔥 **Atenção:** O servidor está sendo reiniciado...\n\nO bot e o aplicativo ficarão offline por cerca de 5 a 10 segundos e voltarão automaticamente.", { parse_mode: "Markdown" });
 
-    // 3. Digita o comando no terminal do Windows
-    // Usando o nome exato do seu processo que vi no seu log: melreels-server
-    exec("pm2 restart melreels-server", (error, stdout, stderr) => {
-        if (error) {
-            console.error(`❌ Erro ao tentar reiniciar o PM2: ${error.message}`);
-            // Se der erro, avisa (Se der certo, o app morre antes dessa linha, o que é o esperado)
-            ctx.reply("❌ Ocorreu um erro ao tentar reiniciar o servidor. Verifique os logs no terminal.");
-        }
-    });
+    // 3. Railway reinicia o processo sozinho (restartPolicyType: ON_FAILURE no railway.json)
+    // ao detectar saída com código de erro — não há PM2 rodando neste ambiente.
+    process.exit(1);
 });
 
 bot.action("ADMIN_TROCAR_START", (ctx) => {
@@ -3583,11 +3592,12 @@ setInterval(async () => {
 
 async function startBot(retries = 0) {
   try {
-    console.log(`🤖 [BOT] Inicializando bot do Telegram (Tentativa #${retries + 1})...`);
-    await bot.launch();
-    console.log(`✅ [BOT] Bot do Telegram rodando com sucesso!`);
+    console.log(`🤖 [BOT] Configurando webhook do Telegram (Tentativa #${retries + 1})...`);
+    const webhookUrl = `${PUBLIC_DOMAIN}${BOT_WEBHOOK_PATH}`;
+    await bot.telegram.setWebhook(webhookUrl, { drop_pending_updates: true });
+    console.log(`✅ [BOT] Webhook do Telegram configurado: ${PUBLIC_DOMAIN}/telegraf-webhook/***`);
   } catch (err) {
-    console.error(`❌ [BOT] Erro ao iniciar bot do Telegram:`, err.message || err);
+    console.error(`❌ [BOT] Erro ao configurar webhook do Telegram:`, err.message || err);
     const nextRetryDelay = Math.min(10000 * Math.pow(1.5, retries), 60000); // Backoff exponencial, max 60s
     console.log(`⏳ [BOT] Tentando novamente em ${Math.round(nextRetryDelay / 1000)}s...`);
     setTimeout(() => startBot(retries + 1), nextRetryDelay);
@@ -3612,12 +3622,12 @@ process.on("unhandledRejection", (reason, promise) => {
   process.exit(1); // Mata o processo imediatamente para o PM2 reiniciar
 });
 
-// Graceful shutdown
+// Graceful shutdown (bot roda em modo webhook, não há polling para parar)
 process.once("SIGINT", () => {
   console.log("🛑 Desligando servidor (SIGINT)...");
-  bot.stop("SIGINT");
+  process.exit(0);
 });
 process.once("SIGTERM", () => {
   console.log("🛑 Desligando servidor (SIGTERM)...");
-  bot.stop("SIGTERM");
+  process.exit(0);
 });
