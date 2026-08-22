@@ -207,7 +207,8 @@ function renderHome() {
         }).join("");
         
         historyHtml += `</div>`;
-        homeContainer.insertAdjacentHTML('beforeend', historyHtml);
+        // Insere logo abaixo do Top 12, não no final da página
+        document.getElementById("top-12-grid").insertAdjacentHTML('afterend', historyHtml);
     }
 	
     // 3. Lógica Blindada de Lançamentos 

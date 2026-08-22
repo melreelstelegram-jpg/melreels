@@ -2089,25 +2089,6 @@ app.get("/api/check-payment", async (req, res) => {
            // Manda a mensagem pro cliente
            await bot.telegram.sendMessage(venda.nr_id_telegram, "🎉 **PAGAMENTO CONFIRMADO!**\n\nSeu acesso Premium foi liberado. Aproveite! 🍿", { parse_mode: "Markdown" }).catch(()=>{});
 
-           // Upsell Pós-Entrega
-           setTimeout(async () => {
-               try {
-                   const temAssinatura = await verificarAssinaturaAtiva(venda.nr_id_telegram);
-                   if (!temAssinatura) {
-                       await bot.telegram.sendMessage(
-                           venda.nr_id_telegram,
-                           `🎬 *Gostou do filme?*\n\nQue tal assistir *tudo* sem limites?\n\n✅ Séries, filmes e doramas\n✅ Sem precisar pagar por cada um\n✅ Cancele quando quiser\n\n👇 *Primeiro mês por apenas R$ 20!*`,
-                           {
-                               parse_mode: "Markdown",
-                               ...Markup.inlineKeyboard([[Markup.button.callback("🚀 Quero assinar por R$ 20", "UPSELL_VER_PLANOS")]])
-                           }
-                       );
-                   }
-               } catch (e) {
-                   console.error("❌ [ERRO UPSELL PÓS-ENTREGA]:", e.message);
-               }
-           }, 30000);
-
            return res.json({ approved: true });
         }
       }
@@ -2587,25 +2568,6 @@ app.post("/webhook-efi", async (req, res) => {
                   }
               ).catch(() => console.log("⚠️ Cliente bloqueou o bot."));
 
-              // Upsell Pós-Entrega
-              setTimeout(async () => {
-                  try {
-                      const temAssinatura = await verificarAssinaturaAtiva(venda.nr_id_telegram);
-                      if (!temAssinatura) {
-                          await bot.telegram.sendMessage(
-                              venda.nr_id_telegram,
-                              `🎬 *Gostou do filme?*\n\nQue tal assistir *tudo* sem limites?\n\n✅ Séries, filmes e doramas\n✅ Sem precisar pagar por cada um\n✅ Cancele quando quiser\n\n👇 *Conheça nossos planos de assinatura!*`,
-                              {
-                                  parse_mode: "Markdown",
-                                  ...Markup.inlineKeyboard([[Markup.button.callback("🚀 Conhecer Planos", "UPSELL_VER_PLANOS")]])
-                              }
-                          );
-                      }
-                  } catch (e) {
-                      console.error("❌ [ERRO UPSELL PÓS-ENTREGA]:", e.message);
-                  }
-              }, 30000);
-
           } catch (err) {
               console.error("❌ Erro processando PIX da Efí:", err.message);
           }
@@ -2623,15 +2585,37 @@ app.post("/webhook-efi", async (req, res) => {
 bot.start(async (ctx) => {
   const payload = ctx.payload; 
   
+  if (payload) {
+    const codeClean = payload.replace("vincular_", "").trim();
+    if (/^\d{6}$/.test(codeClean)) {
+      try {
+        const agora = new Date().toISOString();
+        const { rows: data } = await pool.query(
+          `UPDATE "VINCULACOES_TELEGRAM"
+           SET nr_id_telegram = $1, tp_status = $2, ts_confirmacao = $3
+           WHERE cd_codigo = $4 AND tp_status = $5 AND ts_expiracao > $6
+           RETURNING *`,
+          [ctx.from.id, 'CONFIRMADO', agora, codeClean, "PENDENTE", agora]
+        );
+
+        if (data && data.length > 0) {
+          return ctx.reply("✅ **Conta vinculada com sucesso!**\n\nSua conta na plataforma agora está conectada a este Telegram. Você já pode voltar para o navegador.", { parse_mode: "Markdown" });
+        } else {
+          return ctx.reply("❌ **Código de vinculação inválido ou expirado.**\nGere um novo código no site e tente novamente.", { parse_mode: "Markdown" });
+        }
+      } catch (err) {
+        console.error("Erro ao vincular pelo start:", err.message);
+      }
+    }
+
+    webAppUrl = `${process.env.WEBAPP_URL}?movie=${payload}`; 
+    mensagem = `🎬 **Você recebeu uma recomendação!**\n\nFala, ${ctx.from.first_name}! Clicaram em um link direto para um conteúdo incrível.\n\nClique no botão abaixo para abrir o Melreels e assistir agora mesmo! 🍿🔥`;
+    textoBotao = "▶️ ABRIR FILME";
+  }
+
   let webAppUrl = process.env.WEBAPP_URL;
   let mensagem = `🎬 **Bem-vindo ao Melreels Streaming!**\n\nFala, ${ctx.from.first_name}! Preparado para maratonar?\n\nClique no botão abaixo para acessar nosso catálogo exclusivo de dramas, lançamentos e curtas gerados por IA. 🍿🔥`;
   let textoBotao = "📺 ABRIR CATÁLOGO";
-
-  if (payload) {
-      webAppUrl = `${process.env.WEBAPP_URL}?movie=${payload}`; 
-      mensagem = `🎬 **Você recebeu uma recomendação!**\n\nFala, ${ctx.from.first_name}! Clicaram em um link direto para um conteúdo incrível.\n\nClique no botão abaixo para abrir o Melreels e assistir agora mesmo! 🍿🔥`;
-      textoBotao = "▶️ ABRIR FILME";
-  }
 
   // 🎯 Busca a foto direto do banco (Mais rápido e blindado)
   let fotoStart = "https://i.imgur.com/S86Pj0e.jpeg"; // Imagem padrão absoluta
@@ -3502,25 +3486,6 @@ setInterval(async () => {
                         reply_markup: { inline_keyboard: [[{ text: "🚀 ABRIR MELREELS", web_app: { url: process.env.WEBAPP_URL } }]] }
                     }
                 ).catch(() => {});
-
-                // Upsell Pós-Entrega
-                setTimeout(async () => {
-                    try {
-                        const temAssinatura = await verificarAssinaturaAtiva(venda.nr_id_telegram);
-                        if (!temAssinatura) {
-                            await bot.telegram.sendMessage(
-                                venda.nr_id_telegram,
-                                `🎬 *Gostou do filme?*\n\nQue tal assistir *tudo* sem limites?\n\n✅ Séries, filmes e doramas\n✅ Sem precisar pagar por cada um\n✅ Cancele quando quiser\n\n👇 *Conheça nossos planos de assinatura!*`,
-                                {
-                                    parse_mode: "Markdown",
-                                    ...Markup.inlineKeyboard([[Markup.button.callback("🚀 Conhecer Planos", "UPSELL_VER_PLANOS")]])
-                                }
-                            );
-                        }
-                    } catch (e) {
-                        console.error("❌ [ERRO UPSELL PÓS-ENTREGA]:", e.message);
-                    }
-                }, 30000);
             }
         }
     } catch (err) {
@@ -3528,64 +3493,6 @@ setInterval(async () => {
     }
 }, 2 * 60 * 1000); // Roda exatamente a cada 2 minutos (120.000 ms)
 
-// =================================================================
-// UPSELL POR INATIVIDADE - JOB A CADA 24 HORAS
-// =================================================================
-setInterval(async () => {
-    console.log("⏰ [JOB UPSELL] Iniciando verificação de inatividade...");
-    try {
-        const seteDiasAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-        const { rows: compradores } = await pool.query(
-            `SELECT nr_id_telegram FROM "VENDAS"
-             WHERE tp_compra = ANY($1) AND tp_status = $2 AND ts_criacao > $3`,
-            [["ALUGUEL", "VITALICIO"], "APROVADA", seteDiasAtras]
-        );
-
-        if (compradores && compradores.length > 0) {
-            const distinctUsers = [...new Set(compradores.map(c => c.nr_id_telegram))];
-            
-            for (const userId of distinctUsers) {
-                // 1. REGRA ABSOLUTA: check if user has active subscription
-                const temAssinatura = await verificarAssinaturaAtiva(userId);
-                if (temAssinatura) continue;
-
-                // 2. Check if already received upsell in the last 7 days (ts_enviado > 7 days ago)
-                const umaSemanaAtras = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-                const { rows: logExistenteRows } = await pool.query(
-                    `SELECT nr_id_telegram FROM "UPSELL_LOG" WHERE nr_id_telegram = $1 AND ts_enviado > $2 LIMIT 1`,
-                    [userId, umaSemanaAtras]
-                );
-
-                if (logExistenteRows[0]) continue;
-
-                // 3. Send message
-                try {
-                    await bot.telegram.sendMessage(
-                        userId,
-                        `👋 Oi! Vimos que você assistiu um filme recentemente.\n\n🎯 Sabia que com nossos planos de assinatura você pode assistir a *tudo* que quiser sem limites?\n\nDoramas, filmes, séries — tudo liberado! 🍿\n\nQuer aproveitar?`,
-                        {
-                            parse_mode: "Markdown",
-                            ...Markup.inlineKeyboard([
-                                [Markup.button.callback("✨ Ver planos de assinatura", "UPSELL_VER_PLANOS")],
-                                [Markup.button.callback("❌ Não, obrigado", "UPSELL_RECUSAR")]
-                            ])
-                        }
-                    );
-
-                    // 4. Log to database table UPSELL_LOG
-                    await pool.query(
-                        `INSERT INTO "UPSELL_LOG" (nr_id_telegram, ts_enviado, tp_tipo) VALUES ($1, $2, $3)`,
-                        [userId, new Date().toISOString(), "INATIVIDADE"]
-                    );
-                } catch (err) {
-                    console.error(`❌ [JOB UPSELL] Falha ao enviar para user ${userId}:`, err.message);
-                }
-            }
-        }
-    } catch (err) {
-        console.error("❌ [JOB UPSELL] Erro no job de inatividade:", err.message);
-    }
-}, 86400000); // 24 horas
 // =================================================================
 // 5. INICIALIZAÇÃO SERVER
 // =================================================================
