@@ -128,6 +128,15 @@ function isItemUnlocked(item) {
     return false;
 }
 
+// 🚀 Preço pra exibir no card: usa o aluguel se existir, senão cai pro vitalício.
+// Nunca mostra "R$ 0,00" pra título sem aluguel cadastrado — isso confundia
+// cliente achando que era grátis.
+function precoExibicao(item) {
+    const aluguel = parseFloat(item.vl_aluguel) || 0;
+    if (aluguel > 0) return aluguel;
+    return parseFloat(item.vl_vitalicio) || 0;
+}
+
 // --- 3. RENDERIZAÇÃO DA HOME (ESTILO NETFLIX + TOP 12) ---
 function renderHome() {
     const homeContainer = document.getElementById("home");
@@ -291,7 +300,7 @@ function renderTop12(containerId, items) {
                 
                 <div class="card-top12-info">
                     <div class="card-top12-title">${item.nm_titulo}</div>
-                    <div class="card-top12-price">R$ ${parseFloat(item.vl_aluguel).toFixed(2).replace('.', ',')}</div>
+                    <div class="card-top12-price">R$ ${precoExibicao(item).toFixed(2).replace('.', ',')}</div>
                     
                     <button class="btn-top12-buy" onclick="openMovieDetails('${item.cd_conteudo}')" style="${btnColor}">
                         <i class="fas ${btnIcon}"></i> ${btnText}
@@ -343,7 +352,7 @@ function renderRow(containerId, items, showRank) {
             </div>
             
             <div class="title">${item.nm_titulo}</div>
-            <div class="price">R$ ${parseFloat(item.vl_aluguel).toFixed(2).replace('.', ',')}</div>
+            <div class="price">R$ ${precoExibicao(item).toFixed(2).replace('.', ',')}</div>
             
             <button class="btn-buy-small" onclick="openMovieDetails('${item.cd_conteudo}')" style="${btnStyle}">
                 <i class="fas ${btnIcon}"></i> ${btnText}
@@ -801,18 +810,23 @@ function abrirOpcoes(id, titulo, precoAluguel, precoVitalicio) {
 
   btnVitalicio.innerText = `VITALÍCIO: R$ ${valVitalicio.toFixed(2).replace('.', ',')}`;
   btnAluguel.innerText = `ALUGAR (7 DIAS): R$ ${valAluguel.toFixed(2).replace('.', ',')}`;
-  
+
+  // 🚀 Sem preço cadastrado (R$ 0,00) não é "grátis" — é modalidade indisponível pra esse título.
+  // Mostrar "R$ 0,00" só confundia o cliente e virava chamado de suporte.
+  btnVitalicio.style.display = valVitalicio > 0 ? "" : "none";
+  btnAluguel.style.display = valAluguel > 0 ? "" : "none";
+
   // Lógica de clique nos botões do modal
   btnVitalicio.onclick = () => {
     fecharModalCompra();
     processarCompra(id, titulo, "VITALICIO", valVitalicio);
   };
-  
+
   btnAluguel.onclick = () => {
     fecharModalCompra();
     processarCompra(id, titulo, "ALUGUEL", valAluguel);
   };
-  
+
   // Mostra o modal de vidro
   modal.style.display = "flex";
 }
