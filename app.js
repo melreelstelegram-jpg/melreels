@@ -2583,8 +2583,12 @@ app.post("/webhook-efi", async (req, res) => {
 // Comando /start - Fixo e Limpo (Apenas Imagem)
 // =================================================================
 bot.start(async (ctx) => {
-  const payload = ctx.payload; 
-  
+  const payload = ctx.payload;
+
+  let webAppUrl = process.env.WEBAPP_URL;
+  let mensagem = `🎬 **Bem-vindo ao Melreels Streaming!**\n\nFala, ${ctx.from.first_name}! Preparado para maratonar?\n\nClique no botão abaixo para acessar nosso catálogo exclusivo de dramas, lançamentos e curtas gerados por IA. 🍿🔥`;
+  let textoBotao = "📺 ABRIR CATÁLOGO";
+
   if (payload) {
     const codeClean = payload.replace("vincular_", "").trim();
     if (/^\d{6}$/.test(codeClean)) {
@@ -2608,14 +2612,10 @@ bot.start(async (ctx) => {
       }
     }
 
-    webAppUrl = `${process.env.WEBAPP_URL}?movie=${payload}`; 
+    webAppUrl = `${process.env.WEBAPP_URL}?movie=${payload}`;
     mensagem = `🎬 **Você recebeu uma recomendação!**\n\nFala, ${ctx.from.first_name}! Clicaram em um link direto para um conteúdo incrível.\n\nClique no botão abaixo para abrir o Melreels e assistir agora mesmo! 🍿🔥`;
     textoBotao = "▶️ ABRIR FILME";
   }
-
-  let webAppUrl = process.env.WEBAPP_URL;
-  let mensagem = `🎬 **Bem-vindo ao Melreels Streaming!**\n\nFala, ${ctx.from.first_name}! Preparado para maratonar?\n\nClique no botão abaixo para acessar nosso catálogo exclusivo de dramas, lançamentos e curtas gerados por IA. 🍿🔥`;
-  let textoBotao = "📺 ABRIR CATÁLOGO";
 
   // 🎯 Busca a foto direto do banco (Mais rápido e blindado)
   let fotoStart = "https://i.imgur.com/S86Pj0e.jpeg"; // Imagem padrão absoluta
