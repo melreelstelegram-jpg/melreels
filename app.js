@@ -1733,6 +1733,32 @@ async function verificarAssinaturaAtiva(userId) {
 }
 
 // =================================================================
+// ⏳ CARÊNCIA DE LANÇAMENTO PRA ASSINANTES
+// Mesma regra usada no site (yarinreels_web/src/lib/acesso.ts):
+// lançamentos recentes ficam bloqueados pra quem só tem assinatura por
+// N horas (configurável no admin), pra dar tempo de vender avulso antes
+// e evitar que assinante grave e pirateie no dia do lançamento. Acesso
+// por aluguel/vitalício nunca é afetado — só o gate de assinatura.
+// =================================================================
+async function obterCarenciaHoras() {
+  try {
+    const { rows } = await pool.query(
+      'SELECT nr_horas_carencia_assinante FROM "CONFIGURACAO_SITE" LIMIT 1'
+    );
+    return rows[0]?.nr_horas_carencia_assinante ?? 0;
+  } catch (err) {
+    console.error("❌ Erro ao buscar carência de lançamento:", err.message);
+    return 0; // Falha segura: sem carência, comportamento de sempre
+  }
+}
+
+function dentroDaCarencia(dtLancamento, carenciaHoras) {
+  if (!carenciaHoras || !dtLancamento) return false;
+  const limiteMs = new Date(dtLancamento).getTime() + carenciaHoras * 60 * 60 * 1000;
+  return Date.now() < limiteMs;
+}
+
+// =================================================================
 // 🔔 AVISO DE NOVO EPISÓDIO
 // Avisa quem já começou a assistir (tem histórico) ou comprou/alugou
 // o título — evita spam pra quem nunca abriu esse conteúdo.
@@ -2171,13 +2197,17 @@ app.post("/api/watch-video", async (req, res) => {
     const normCat = (s) => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const catConteudo = normCat(filme?.nm_categoria);
 
-    const temDireito = acessos.some(a => {
-        if (a.cd_conteudo === cd_conteudo) return true;
+    const acessoDireto = acessos.some(a => a.cd_conteudo === cd_conteudo);
+
+    const carenciaHoras = await obterCarenciaHoras();
+    const emCarencia = dentroDaCarencia(filme?.dt_lancamento, carenciaHoras);
+
+    const acessoPorAssinatura = !emCarencia && acessos.some(a => {
         if (!a.planoCategoria) return false;
 
         const catPlano = normCat(a.planoCategoria);
         if (catPlano === 'todas' || catPlano === 'tudo' || catPlano === 'todos') return true;
-        
+
         if (catPlano.includes('asiatica') && catConteudo.includes('dorama')) return true;
         if (catPlano.includes('dorama') && catConteudo.includes('asiatica')) return true;
         if (catPlano.includes('americano') && catConteudo.includes('americana')) return true;
@@ -2187,7 +2217,17 @@ app.post("/api/watch-video", async (req, res) => {
         return catsDoPlano.some(c => catConteudo === c);
     });
 
-    if (!temDireito) return res.status(403).json({ error: "Acesso expirado ou Categoria não autorizada no seu Plano." });
+    const temDireito = acessoDireto || acessoPorAssinatura;
+
+    if (!temDireito) {
+        if (emCarencia) {
+            return res.status(403).json({
+                error: "Lançamento recente — disponível só por compra avulsa (aluguel ou vitalício) por enquanto.",
+                emCarencia: true
+            });
+        }
+        return res.status(403).json({ error: "Acesso expirado ou Categoria não autorizada no seu Plano." });
+    }
 
     let fileIdParaEnviar = "";
     let legenda = "";
@@ -2320,7 +2360,7 @@ app.get("/api/smart-stream", async (req, res) => {
 
     // Puxa a categoria do conteúdo para cruzar com o Plano VIP
     const { rows: conteudoCheckRows } = await pool.query(
-      'SELECT nm_categoria, tp_fonte_prioritaria FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1',
+      'SELECT nm_categoria, tp_fonte_prioritaria, dt_lancamento FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1',
       [cd_conteudo]
     );
     const conteudoCheck = conteudoCheckRows[0];
@@ -2334,14 +2374,18 @@ app.get("/api/smart-stream", async (req, res) => {
     const normCat = (s) => (s || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     const catConteudo = normCat(conteudoCheck?.nm_categoria);
     
-    const temDireito = acessos.some(a => {
-        if (a.cd_conteudo === cd_conteudo) return true;
+    const acessoDireto = acessos.some(a => a.cd_conteudo === cd_conteudo);
+
+    const carenciaHoras = await obterCarenciaHoras();
+    const emCarencia = dentroDaCarencia(conteudoCheck?.dt_lancamento, carenciaHoras);
+
+    const acessoPorAssinatura = !emCarencia && acessos.some(a => {
         if (!a.planoCategoria) return false;
 
         const catPlano = normCat(a.planoCategoria);
         // 🚀 BLINDAGEM: Aceita qualquer variação
         if (catPlano === 'todas' || catPlano === 'tudo' || catPlano === 'todos') return true;
-        
+
         if (catPlano.includes('asiatica') && catConteudo.includes('dorama')) return true;
         if (catPlano.includes('dorama') && catConteudo.includes('asiatica')) return true;
         if (catPlano.includes('americano') && catConteudo.includes('americana')) return true;
@@ -2351,7 +2395,13 @@ app.get("/api/smart-stream", async (req, res) => {
         return catsDoPlano.some(c => catConteudo === c);
     });
 
+    const temDireito = acessoDireto || acessoPorAssinatura;
+
     if (!temDireito) {
+        if (emCarencia) {
+            console.log(`⏳ [ROTEADOR] Usuário ${userId} bloqueado por carência de lançamento.`);
+            return res.status(403).send("Lançamento recente — disponível só por compra avulsa (aluguel ou vitalício) por enquanto.");
+        }
         console.log(`🚫 [ROTEADOR] Usuário ${userId} tentou acessar conteúdo sem permissão.`);
         return res.status(403).send("Conteúdo não autorizado no seu plano.");
     }
