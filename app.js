@@ -418,6 +418,9 @@ const adicionarEpisodioScene = new Scenes.WizardScene(
         );
 
         await ctx.reply(`✅ **Episódio ${ctx.wizard.state.nrEpisodio} adicionado com sucesso!**`, { parse_mode: "Markdown" });
+
+        // 🔔 Avisa quem já tá assistindo essa série, sem travar a resposta pro admin
+        notificarNovoEpisodio(ctx.wizard.state.serieId, ctx.wizard.state.nrEpisodio, ctx.wizard.state.nmEpisodio).catch(() => {});
     } catch (e) {
         console.error("Erro ao salvar episódio:", e.message);
         await ctx.reply("❌ Erro ao salvar no banco de dados.");
@@ -1726,6 +1729,52 @@ async function verificarAssinaturaAtiva(userId) {
   } catch (err) {
     console.error("❌ Erro ao verificar assinatura ativa:", err.message);
     return false;
+  }
+}
+
+// =================================================================
+// 🔔 AVISO DE NOVO EPISÓDIO
+// Avisa quem já começou a assistir (tem histórico) ou comprou/alugou
+// o título — evita spam pra quem nunca abriu esse conteúdo.
+// =================================================================
+async function notificarNovoEpisodio(serieId, numEpisodio, tituloEpisodio) {
+  try {
+    const { rows: serieRows } = await pool.query('SELECT nm_titulo FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1', [serieId]);
+    const tituloSerie = serieRows[0]?.nm_titulo || "Sua série";
+
+    const { rows: interessados } = await pool.query(
+      `SELECT DISTINCT nr_id_telegram FROM (
+         SELECT nr_id_telegram FROM "HISTORICO" WHERE cd_conteudo = $1
+         UNION
+         SELECT nr_id_telegram FROM "VENDAS" WHERE cd_conteudo = $1 AND tp_status = 'APROVADA'
+       ) AS quem_ja_assiste`,
+      [serieId]
+    );
+
+    if (!interessados || interessados.length === 0) return;
+
+    console.log(`🔔 [EPISÓDIO NOVO] Avisando ${interessados.length} usuário(s) sobre "${tituloSerie}" EP ${numEpisodio}...`);
+
+    const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+    const webAppUrl = `${process.env.WEBAPP_URL}?movie=${serieId}`;
+
+    for (const u of interessados) {
+      try {
+        await bot.telegram.sendMessage(
+          u.nr_id_telegram,
+          `🔔 **Novo episódio no ar!**\n\n📺 *${tituloSerie}*\n🎬 EP ${numEpisodio}: ${tituloEpisodio}\n\nJá está liberado no app! 🍿`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: { inline_keyboard: [[{ text: "▶️ ASSISTIR AGORA", web_app: { url: webAppUrl } }]] }
+          }
+        );
+      } catch (e) {
+        // Usuário bloqueou o bot ou não pode receber mensagem — segue o baile
+      }
+      await delay(100); // Respeita o limite de ~30 msgs/s do Telegram
+    }
+  } catch (err) {
+    console.error("❌ [EPISÓDIO NOVO] Erro ao notificar:", err.message);
   }
 }
 
@@ -3396,6 +3445,9 @@ bot.on("channel_post", async (ctx) => {
           { parse_mode: "Markdown" }
         ).catch(() => {});
       }
+
+      // 🔔 Avisa quem já tá assistindo essa série
+      notificarNovoEpisodio(serieId, numEp, tituloEp || `Episódio ${numEp}`).catch(() => {});
       return;
     }
 
