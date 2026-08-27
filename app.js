@@ -1078,6 +1078,11 @@ const atualizarFilmeScene = new Scenes.WizardScene(
       catalogCache.data = null; // Limpa o cache para o site atualizar
 
       await ctx.reply(`✅ **Sucesso!**\n\nO campo foi atualizado no banco de dados. O Mini App já refletirá a mudança.`);
+
+      // 🔔 Vídeo (arquivo ou link) trocado = conteúdo com mais minutos/episódios pra quem já assistia
+      if (coluna === "ds_file_id_telegram" || coluna === "ds_url_bunny") {
+        notificarConteudoAtualizado(conteudoId, ctx.wizard.state.nomeFilme).catch(() => {});
+      }
     } catch (err) {
       console.error(err);
       await ctx.reply("❌ Erro ao atualizar no banco. Verifique o formato do dado enviado.");
@@ -1759,48 +1764,65 @@ function dentroDaCarencia(dtLancamento, carenciaHoras) {
 }
 
 // =================================================================
-// 🔔 AVISO DE NOVO EPISÓDIO
+// 🔔 AVISOS DE CONTEÚDO NOVO/ATUALIZADO
 // Avisa quem já começou a assistir (tem histórico) ou comprou/alugou
 // o título — evita spam pra quem nunca abriu esse conteúdo.
 // =================================================================
+
+// Manda a mensagem pra quem já tem envolvimento com o conteúdo (histórico ou compra aprovada).
+// Devolve quantos usuários foram avisados.
+async function avisarInteressados(cdConteudo, mensagem) {
+  const { rows: interessados } = await pool.query(
+    `SELECT DISTINCT nr_id_telegram FROM (
+       SELECT nr_id_telegram FROM "HISTORICO" WHERE cd_conteudo = $1
+       UNION
+       SELECT nr_id_telegram FROM "VENDAS" WHERE cd_conteudo = $1 AND tp_status = 'APROVADA'
+     ) AS quem_ja_assiste`,
+    [cdConteudo]
+  );
+
+  if (!interessados || interessados.length === 0) return 0;
+
+  const delay = (ms) => new Promise((res) => setTimeout(res, ms));
+  const webAppUrl = `${process.env.WEBAPP_URL}?movie=${cdConteudo}`;
+
+  for (const u of interessados) {
+    try {
+      await bot.telegram.sendMessage(u.nr_id_telegram, mensagem, {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: [[{ text: "▶️ ASSISTIR AGORA", web_app: { url: webAppUrl } }]] }
+      });
+    } catch (e) {
+      // Usuário bloqueou o bot ou não pode receber mensagem — segue o baile
+    }
+    await delay(100); // Respeita o limite de ~30 msgs/s do Telegram
+  }
+  return interessados.length;
+}
+
+// Conteúdo com episódios cadastrados separadamente na tabela EPISODIOS.
 async function notificarNovoEpisodio(serieId, numEpisodio, tituloEpisodio) {
   try {
     const { rows: serieRows } = await pool.query('SELECT nm_titulo FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1', [serieId]);
     const tituloSerie = serieRows[0]?.nm_titulo || "Sua série";
 
-    const { rows: interessados } = await pool.query(
-      `SELECT DISTINCT nr_id_telegram FROM (
-         SELECT nr_id_telegram FROM "HISTORICO" WHERE cd_conteudo = $1
-         UNION
-         SELECT nr_id_telegram FROM "VENDAS" WHERE cd_conteudo = $1 AND tp_status = 'APROVADA'
-       ) AS quem_ja_assiste`,
-      [serieId]
-    );
-
-    if (!interessados || interessados.length === 0) return;
-
-    console.log(`🔔 [EPISÓDIO NOVO] Avisando ${interessados.length} usuário(s) sobre "${tituloSerie}" EP ${numEpisodio}...`);
-
-    const delay = (ms) => new Promise((res) => setTimeout(res, ms));
-    const webAppUrl = `${process.env.WEBAPP_URL}?movie=${serieId}`;
-
-    for (const u of interessados) {
-      try {
-        await bot.telegram.sendMessage(
-          u.nr_id_telegram,
-          `🔔 **Novo episódio no ar!**\n\n📺 *${tituloSerie}*\n🎬 EP ${numEpisodio}: ${tituloEpisodio}\n\nJá está liberado no app! 🍿`,
-          {
-            parse_mode: "Markdown",
-            reply_markup: { inline_keyboard: [[{ text: "▶️ ASSISTIR AGORA", web_app: { url: webAppUrl } }]] }
-          }
-        );
-      } catch (e) {
-        // Usuário bloqueou o bot ou não pode receber mensagem — segue o baile
-      }
-      await delay(100); // Respeita o limite de ~30 msgs/s do Telegram
-    }
+    const mensagem = `🔔 **Novo episódio no ar!**\n\n📺 *${tituloSerie}*\n🎬 EP ${numEpisodio}: ${tituloEpisodio}\n\nJá está liberado no app! 🍿`;
+    const total = await avisarInteressados(serieId, mensagem);
+    if (total > 0) console.log(`🔔 [EPISÓDIO NOVO] Avisados ${total} usuário(s) sobre "${tituloSerie}" EP ${numEpisodio}.`);
   } catch (err) {
     console.error("❌ [EPISÓDIO NOVO] Erro ao notificar:", err.message);
+  }
+}
+
+// Conteúdo em vídeo único que cresce com o tempo (ex: StoryReel) — o admin
+// substitui o arquivo/link do próprio título em vez de cadastrar episódio novo.
+async function notificarConteudoAtualizado(conteudoId, tituloConteudo) {
+  try {
+    const mensagem = `🔔 **Novidade em "${tituloConteudo}"!**\n\nO vídeo foi atualizado com mais conteúdo — já dá pra continuar de onde parou! 🍿`;
+    const total = await avisarInteressados(conteudoId, mensagem);
+    if (total > 0) console.log(`🔔 [VÍDEO ATUALIZADO] Avisados ${total} usuário(s) sobre "${tituloConteudo}".`);
+  } catch (err) {
+    console.error("❌ [VÍDEO ATUALIZADO] Erro ao notificar:", err.message);
   }
 }
 
