@@ -997,6 +997,7 @@ const atualizarFilmeScene = new Scenes.WizardScene(
           [{ text: "Tempo Vídeo", callback_data: "EDIT_nr_duracao_minutos" }, { text: "Trailer (YT)", callback_data: "EDIT_ds_url_trailer_youtube" }],
           [{ text: "Banner", callback_data: "EDIT_ds_url_poster" }, { text: "Link Bunny", callback_data: "EDIT_ds_url_bunny" }],
           [{ text: "ID Local/TG", callback_data: "EDIT_ds_file_id_telegram" }, { text: "🔁 Fonte", callback_data: "EDIT_tp_fonte_prioritaria" }],
+          [{ text: "⏳ Carência de Lançamento", callback_data: "EDIT_sn_carencia_ativa" }],
           [{ text: "❌ Cancelar", callback_data: "CANCELAR_EDIT" }]
         ]
       }
@@ -1020,6 +1021,28 @@ const atualizarFilmeScene = new Scenes.WizardScene(
 
     const coluna = data.replace("EDIT_", "");
     ctx.wizard.state.colunaParaEditar = coluna;
+
+    // 🚀 Carência é liga/desliga — inverte na hora, sem precisar digitar nada
+    if (coluna === "sn_carencia_ativa") {
+      try {
+        const { rows } = await pool.query(
+          `UPDATE "CONTEUDOS" SET sn_carencia_ativa = NOT sn_carencia_ativa WHERE cd_conteudo = $1 RETURNING sn_carencia_ativa`,
+          [ctx.wizard.state.conteudoId]
+        );
+        const novoEstado = rows[0]?.sn_carencia_ativa;
+        catalogCache.data = null;
+        await ctx.reply(
+          novoEstado
+            ? `✅ **Carência de lançamento ATIVADA** para "${ctx.wizard.state.nomeFilme}".\n\nEsse título vai ficar bloqueado pra assinantes (só compra avulsa libera) pelas horas configuradas em Configurações.`
+            : `✅ **Carência de lançamento DESATIVADA** para "${ctx.wizard.state.nomeFilme}".\n\nAssinantes já têm acesso normal a esse título.`,
+          { parse_mode: "Markdown" }
+        );
+      } catch (err) {
+        console.error("❌ [ERRO CARÊNCIA]:", err.message);
+        await ctx.reply("❌ Erro ao atualizar a carência no banco.");
+      }
+      return ctx.scene.leave();
+    }
 
     const nomesAmigaveis = {
       nm_titulo: "o NOVO NOME",
@@ -1757,9 +1780,13 @@ async function obterCarenciaHoras() {
   }
 }
 
-function dentroDaCarencia(dtLancamento, carenciaHoras) {
-  if (!carenciaHoras || !dtLancamento) return false;
-  const limiteMs = new Date(dtLancamento).getTime() + carenciaHoras * 60 * 60 * 1000;
+// Usa ts_criacao (quando o conteúdo foi de fato publicado no sistema), não
+// dt_lancamento — esse é só a data "AAAA-MM-DD" digitada pelo admin (sem
+// horário, vira meia-noite UTC = 21h do dia anterior em Brasília), então a
+// janela de carência fechava sozinha horas antes do conteúdo ir ao ar.
+function dentroDaCarencia(tsCriacao, carenciaHoras) {
+  if (!carenciaHoras || !tsCriacao) return false;
+  const limiteMs = new Date(tsCriacao).getTime() + carenciaHoras * 60 * 60 * 1000;
   return Date.now() < limiteMs;
 }
 
@@ -2222,7 +2249,7 @@ app.post("/api/watch-video", async (req, res) => {
     const acessoDireto = acessos.some(a => a.cd_conteudo === cd_conteudo);
 
     const carenciaHoras = await obterCarenciaHoras();
-    const emCarencia = dentroDaCarencia(filme?.dt_lancamento, carenciaHoras);
+    const emCarencia = !!filme?.sn_carencia_ativa && dentroDaCarencia(filme?.ts_criacao, carenciaHoras);
 
     const acessoPorAssinatura = !emCarencia && acessos.some(a => {
         if (!a.planoCategoria) return false;
@@ -2382,7 +2409,7 @@ app.get("/api/smart-stream", async (req, res) => {
 
     // Puxa a categoria do conteúdo para cruzar com o Plano VIP
     const { rows: conteudoCheckRows } = await pool.query(
-      'SELECT nm_categoria, tp_fonte_prioritaria, dt_lancamento FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1',
+      'SELECT nm_categoria, tp_fonte_prioritaria, ts_criacao, sn_carencia_ativa FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1',
       [cd_conteudo]
     );
     const conteudoCheck = conteudoCheckRows[0];
@@ -2399,7 +2426,7 @@ app.get("/api/smart-stream", async (req, res) => {
     const acessoDireto = acessos.some(a => a.cd_conteudo === cd_conteudo);
 
     const carenciaHoras = await obterCarenciaHoras();
-    const emCarencia = dentroDaCarencia(conteudoCheck?.dt_lancamento, carenciaHoras);
+    const emCarencia = !!conteudoCheck?.sn_carencia_ativa && dentroDaCarencia(conteudoCheck?.ts_criacao, carenciaHoras);
 
     const acessoPorAssinatura = !emCarencia && acessos.some(a => {
         if (!a.planoCategoria) return false;
