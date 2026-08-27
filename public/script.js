@@ -1036,6 +1036,35 @@ async function assistir(conteudoId, titulo, episodioId = null) {
     let streamUrl = `/api/smart-stream?userId=${userId}&cd_conteudo=${conteudoId}`;
     if (episodioId) streamUrl += `&episodioId=${episodioId}`;
 
+    // 🚀 Checa o acesso ANTES de abrir o player. Sem isso, um bloqueio (carência,
+    // plano incompatível, etc.) fazia o vídeo simplesmente não abrir, sem
+    // nenhuma mensagem pro cliente — parecia bug em vez de acesso negado.
+    // redirect:'manual' evita baixar o vídeo inteiro só pra checar: se a fonte
+    // é LOCAL/BUNNY o servidor responde com um redirect "opaco" (não seguido
+    // aqui, só confirma que foi liberado); se é TELEGRAM ele transmite os bytes
+    // direto, então cancelamos o corpo pra não baixar 2x.
+    try {
+        const checkRes = await fetch(streamUrl, { redirect: "manual" });
+        if (checkRes.type === "opaqueredirect") {
+            // Liberado via LOCAL/BUNNY — segue o fluxo normal abaixo
+        } else if (checkRes.ok) {
+            checkRes.body?.cancel().catch(() => {}); // Liberado via TELEGRAM, mas não precisamos do corpo agora
+        } else {
+            let mensagemErro = "Não foi possível abrir este conteúdo.";
+            try {
+                const dataErro = await checkRes.clone().json();
+                if (dataErro?.error) mensagemErro = dataErro.error;
+            } catch (e) {
+                const textoErro = await checkRes.text().catch(() => null);
+                if (textoErro) mensagemErro = textoErro;
+            }
+            tg.showAlert(`⚠️ ${mensagemErro}`);
+            return;
+        }
+    } catch (e) {
+        // Falha de rede na checagem — deixa o player tentar carregar normalmente
+    }
+
     // Detecta HLS apenas pelo tipo de URL cadastrado (sem expor a URL real ao frontend)
     const isBunnyHls = item?.tp_fonte_prioritaria === 'BUNNY' && item?.ds_url_bunny?.includes('.m3u8');
 
