@@ -1088,8 +1088,11 @@ async function assistir(conteudoId, titulo, episodioId = null) {
     
     // Assim que o vídeo tiver tamanho e duração lidos, pula pro tempo!
     player.addEventListener('loadedmetadata', function onMeta() {
-        // Se já assistiu mais de 5 segundos, pula pro tempo salvo
-        if (hist && hist.nr_tempo_atual > 5) {
+        // Se já assistiu mais de 5 segundos E ainda não terminou (< 95%), pula pro tempo salvo.
+        // Sem o teto de 95%, reabrir um filme já concluído pulava quase pro final de novo,
+        // em vez de começar do zero.
+        const jaTerminou = hist && hist.nr_tempo_total > 0 && (hist.nr_tempo_atual / hist.nr_tempo_total) >= 0.95;
+        if (hist && hist.nr_tempo_atual > 5 && !jaTerminou) {
             player.currentTime = hist.nr_tempo_atual;
         }
     }, { once: true }); // Executa só uma vez pra não bugar se o vídeo travar
@@ -1143,14 +1146,19 @@ async function assistir(conteudoId, titulo, episodioId = null) {
 
     player.onpause = () => container.classList.add("paused");
     player.onplay = () => container.classList.remove("paused");
-    
+
     player.onended = () => {
+        // 🚀 iOS tem uma tela cheia própria do <video> (webkitEnterFullscreen), fora
+        // da Fullscreen API padrão. document.exitFullscreen() não sai dela — o vídeo
+        // ficava preso mostrando o último quadro, como se tivesse travado.
+        if (player.webkitExitFullscreen) player.webkitExitFullscreen();
+        if (document.fullscreenElement) {
+            if (document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+        }
+
         // Exibe o overlay de Upsell Pós-Filme se o usuário não for VIP (sem assinatura ativa)
         if (!userStatusData || !userStatusData.isVip) {
-            if (document.fullscreenElement) {
-                if (document.exitFullscreen) document.exitFullscreen().catch(()=>{});
-                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
-            }
             const upsellOverlay = document.getElementById("upsell-pos-filme");
             if (upsellOverlay) upsellOverlay.style.display = "flex";
         } else {
