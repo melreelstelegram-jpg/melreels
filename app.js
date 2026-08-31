@@ -516,16 +516,16 @@ const gerenciarClienteScene = new Scenes.WizardScene(
         );
 
         // 3. MONTA O RELATÓRIO DETALHADO (Arquivo TXT)
-        let logContent = `===================================================\n 📊 RELATÓRIO DE AUDITORIA - MELREELS\n===================================================\n\n👤 ID DO USUÁRIO: ${userId}\n🚦 STATUS DA CONTA: ${isBanned ? '🔴 BANIDO' : '🟢 ATIVO'}\n📅 DATA DA EXTRAÇÃO: ${new Date().toLocaleString('pt-BR')}\n🛒 TOTAL DE INTERAÇÕES: ${historico ? historico.length : 0}\n\n---------------------------------------------------\n 📜 HISTÓRICO DE SOLICITAÇÕES E COMPRAS\n---------------------------------------------------\n\n`;
+        let logContent = `===================================================\n 📊 RELATÓRIO DE AUDITORIA - MELREELS\n===================================================\n\n👤 ID DO USUÁRIO: ${userId}\n🚦 STATUS DA CONTA: ${isBanned ? '🔴 BANIDO' : '🟢 ATIVO'}\n📅 DATA DA EXTRAÇÃO: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n🛒 TOTAL DE INTERAÇÕES: ${historico ? historico.length : 0}\n\n---------------------------------------------------\n 📜 HISTÓRICO DE SOLICITAÇÕES E COMPRAS\n---------------------------------------------------\n\n`;
 
         if (!historico || historico.length === 0) {
             logContent += `Nenhum registro encontrado para este usuário.\n`;
         } else {
             historico.forEach((v, index) => {
                 const itemNome = v.tp_compra === "ASSINATURA" ? v.planoNome : v.conteudoTitulo;
-                const dataSolicitacao = v.ts_criacao ? new Date(v.ts_criacao).toLocaleString('pt-BR') : 'N/D';
-                const dataAtualizacao = v.ts_atualizacao ? new Date(v.ts_atualizacao).toLocaleString('pt-BR') : 'N/D';
-                const dataExpiracao = v.ts_expiracao ? new Date(v.ts_expiracao).toLocaleString('pt-BR') : 'N/D';
+                const dataSolicitacao = v.ts_criacao ? new Date(v.ts_criacao).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'N/D';
+                const dataAtualizacao = v.ts_atualizacao ? new Date(v.ts_atualizacao).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'N/D';
+                const dataExpiracao = v.ts_expiracao ? new Date(v.ts_expiracao).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'N/D';
                 
                 logContent += `[${index + 1}] ITEM: ${itemNome || 'Conteúdo Excluído'}\n    🔹 Modalidade: ${v.tp_compra}\n`;
                 if (v.tp_status === "APROVADA") {
@@ -654,7 +654,7 @@ const gerenciarClienteScene = new Scenes.WizardScene(
             // Informações do Cliente
             doc.fontSize(14).font('Helvetica-Bold').text('Detalhes do Cliente');
             doc.fontSize(10).font('Helvetica').text(`Telegram ID: ${userId}`);
-            doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`);
+            doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`);
             doc.moveDown(2);
 
             // Título da Lista
@@ -664,8 +664,8 @@ const gerenciarClienteScene = new Scenes.WizardScene(
             // Popula a Lista do Banco de Dados
             vendas.forEach((v, index) => {
                 const nome = v.tp_compra === "ASSINATURA" ? `Plano VIP: ${v.planoNome}` : `🎬 ${v.conteudoTitulo}`;
-                const dataVenc = new Date(v.ts_expiracao).toLocaleDateString('pt-BR');
-                
+                const dataVenc = new Date(v.ts_expiracao).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+
                 doc.fontSize(10).font('Helvetica-Bold').fillColor('#111111').text(`${index + 1}. ${nome}`);
                 doc.fontSize(9).font('Helvetica').fillColor('#555555').text(`Expira em: ${dataVenc}`);
                 doc.moveDown(0.5);
@@ -1325,7 +1325,7 @@ const consultarTxidScene = new Scenes.WizardScene(
         let msg = `✅ **TRANSAÇÃO ENCONTRADA:**\n\n`;
         vendas.forEach(v => {
             const item = v.tp_compra === "ASSINATURA" ? `👑 ${v.planoNome}` : `🎬 ${v.conteudoTitulo}`;
-            const dataCriacao = new Date(v.ts_criacao).toLocaleString('pt-BR');
+            const dataCriacao = new Date(v.ts_criacao).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
             
             msg += `🧾 **TXID:** \`${v.ds_txid}\`\n`;
             // 🚀 Aqui o ID ganha o link clicável direto pro chat da pessoa!
@@ -2978,7 +2978,7 @@ bot.command("ranking", async (ctx) => {
     }
     
     const inicioMes = new Date();
-    const nomeMes = inicioMes.toLocaleString('pt-BR', { month: 'long' }).toUpperCase();
+    const nomeMes = inicioMes.toLocaleString('pt-BR', { month: 'long', timeZone: 'America/Sao_Paulo' }).toUpperCase();
     await ctx.reply(`⏳ Calculando ranking de **${nomeMes}**...`);
     
     try {
@@ -3125,7 +3125,7 @@ bot.action("ADMIN_VER_ONLINE", async (ctx) => {
         msg += `👥 Total: **${online.length} usuários**\n\n`;
 
         online.forEach(u => {
-            const dataAtividade = new Date(u.ultima_atividade).toLocaleTimeString('pt-BR');
+            const dataAtividade = new Date(u.ultima_atividade).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo' });
             // Se tiver filme no Join, mostra. Se for Null, ele tá no menu principal
             const titulo = u.conteudoTitulo || "Navegando no Catálogo";
             
@@ -3248,7 +3248,7 @@ bot.action("ADMIN_VER_VENCIDOS", async (ctx) => {
   let texto = "📅 **ÚLTIMOS ACESSOS VENCIDOS:**\n\n";
   vencidos.forEach(v => {
     const item = v.tp_compra === "ASSINATURA" ? v.planoNome : v.conteudoTitulo;
-    const dataVenc = new Date(v.ts_expiracao).toLocaleDateString('pt-BR');
+    const dataVenc = new Date(v.ts_expiracao).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
     texto += `👤 ID: \`${v.nr_id_telegram}\`\n🍿 Item: ${item}\n⏱ Venceu em: ${dataVenc}\n\n`;
   });
 
