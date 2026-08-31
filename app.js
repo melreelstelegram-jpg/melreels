@@ -1693,6 +1693,69 @@ const transmitirAvisoScene = new Scenes.WizardScene(
   }
 );
 
+// =================================================================
+// 📢 FLUXO ADMIN: AVISO MANUAL PRA QUEM ASSISTE UMA SÉRIE ESPECÍFICA
+// =================================================================
+const avisarSerieScene = new Scenes.WizardScene(
+  "AVISAR_SERIE_SCENE",
+
+  async (ctx) => {
+    await ctx.answerCbQuery().catch(()=>{});
+    await ctx.reply("📢 **AVISO PARA UM TÍTULO ESPECÍFICO**\n\nEnvie o **ID (UUID)** do filme/série cujos espectadores você quer avisar:\n\n*(Ou digite CANCELAR para sair)*", { parse_mode: "Markdown" });
+    return ctx.wizard.next();
+  },
+
+  async (ctx) => {
+    if (!ctx.message || !ctx.message.text) return;
+    const texto = ctx.message.text.trim();
+
+    if (texto.toUpperCase() === "CANCELAR") {
+      await ctx.reply("❌ Operação cancelada.");
+      return ctx.scene.leave();
+    }
+
+    const { rows: conteudoRows } = await pool.query('SELECT nm_titulo FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1', [texto]);
+    const conteudo = conteudoRows[0];
+
+    if (!conteudo) {
+      await ctx.reply("❌ Nenhum conteúdo encontrado com esse ID. Operação cancelada.");
+      return ctx.scene.leave();
+    }
+
+    ctx.wizard.state.conteudoId = texto;
+    ctx.wizard.state.tituloConteudo = conteudo.nm_titulo;
+
+    await ctx.reply(`✍️ Digite a mensagem que você quer mandar pra quem já assiste **"${conteudo.nm_titulo}"**:`, { parse_mode: "Markdown" });
+    return ctx.wizard.next();
+  },
+
+  async (ctx) => {
+    if (!ctx.message || !ctx.message.text) return;
+    const mensagem = ctx.message.text;
+    const { conteudoId, tituloConteudo } = ctx.wizard.state;
+
+    const loadingMsg = await ctx.reply("⏳ Buscando quem já assiste esse título...");
+
+    try {
+      const total = await avisarInteressados(conteudoId, mensagem);
+
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+
+      if (total === 0) {
+        await ctx.reply(`❌ Ninguém tem histórico ou compra aprovada de **"${tituloConteudo}"** ainda — nenhuma mensagem foi enviada.`, { parse_mode: "Markdown" });
+      } else {
+        await ctx.reply(`✅ **Aviso enviado!**\n\n📤 ${total} usuário(s) de **"${tituloConteudo}"** foram avisados.`, { parse_mode: "Markdown" });
+      }
+    } catch (err) {
+      console.error("❌ [ERRO AVISAR SÉRIE]:", err.message);
+      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
+      await ctx.reply("❌ Ocorreu um erro ao enviar o aviso.");
+    }
+
+    return ctx.scene.leave();
+  }
+);
+
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -1740,7 +1803,8 @@ const stage = new Scenes.Stage([
   editarCarrosselScene,
   consultarTxidScene,
   excluirPlanoScene,
-  transmitirAvisoScene
+  transmitirAvisoScene,
+  avisarSerieScene
 ]);
 // =================================================================
 // SISTEMA DE UPSELL INTELIGENTE - HELPER & SESSIONS
@@ -2893,6 +2957,7 @@ bot.command("admin", async (ctx) => {
         [{ text: "🗑️ Excluir Conteúdo do Catálogo", callback_data: "ADMIN_EXCLUIR_CONTEUDO" }],
         [{ text: "🔗 Gerar Link de Divulgação (Para Grupos)", callback_data: "ADMIN_GERAR_LINK" }],
 		[{ text: "📢 Enviar Aviso Global (Broadcast)", callback_data: "ADMIN_TRANSMITIR" }],
+        [{ text: "🔔 Avisar Quem Assiste um Título", callback_data: "ADMIN_AVISAR_SERIE" }],
         [{ text: "📅 Ver Assinaturas Vencidas", callback_data: "ADMIN_VER_VENCIDOS" }],
         [{ text: "🎡 Editar Carrossel (Topo do App)", callback_data: "ADMIN_EDITAR_CARROSSEL" }],
         [{ text: "🔍 Consultar TXID (Pix)", callback_data: "ADMIN_CONSULTAR_TXID" }],
@@ -3238,6 +3303,10 @@ bot.action("UPSELL_RECUSAR", async (ctx) => {
 
 bot.action("ADMIN_TRANSMITIR", (ctx) => {
   ctx.scene.enter("TRANSMITIR_AVISO_SCENE");
+});
+
+bot.action("ADMIN_AVISAR_SERIE", (ctx) => {
+  ctx.scene.enter("AVISAR_SERIE_SCENE");
 });
 
 bot.action("UPSELL_CONTINUAR_COMPRA", async (ctx) => {
