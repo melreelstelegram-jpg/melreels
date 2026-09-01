@@ -1773,15 +1773,20 @@ app.use(express.static("public", {
 
 
 app.use(async (req, res, next) => {
-  
-  const userId = req.query.userId || req.body?.nr_id_telegram; 
-  
+
+  const userId = req.query.userId || req.body?.nr_id_telegram;
+
   if (userId && userId !== "0" && userId !== "undefined") {
     const { rows: banRows } = await pool.query('SELECT * FROM "BANS" WHERE nr_id_telegram = $1 LIMIT 1', [userId]);
     const ban = banRows[0];
-    if (ban) {
-      console.log(`🚫 [BLOCK] Usuário banido tentou acessar: ${userId}`);
-      return res.status(403).json({ error: "Sua conta foi suspensa." });
+    // 🚫 Só bloqueia TUDO (catálogo, minha lista, assistir) em banimento TOTAL.
+    // COMPRAS/PERSONALIZADO deixam o cliente navegar e assistir o que já tem —
+    // só a compra nova é barrada (checado em /api/create-order). Bans antigos
+    // sem tp_banimento definido (criados direto pelo bot, sem essa coluna)
+    // continuam se comportando como TOTAL, igual já é no site.
+    if (ban && (ban.tp_banimento ?? "TOTAL") === "TOTAL") {
+      console.log(`🚫 [BLOCK] Usuário banido (TOTAL) tentou acessar: ${userId}`);
+      return res.status(403).json({ error: ban.ds_mensagem_bloqueio || "Sua conta foi suspensa." });
     }
   }
   next();
@@ -1841,6 +1846,37 @@ async function obterCarenciaHoras() {
   } catch (err) {
     console.error("❌ Erro ao buscar carência de lançamento:", err.message);
     return 0; // Falha segura: sem carência, comportamento de sempre
+  }
+}
+
+// =================================================================
+// 🚫 BANIMENTO PARCIAL — checagem específica pra COMPRA NOVA
+// Mesma regra do site (yarinreels_web/checkout/actions.ts): TOTAL e COMPRAS
+// bloqueiam qualquer compra nova; PERSONALIZADO só bloqueia as ações
+// marcadas em ds_acoes_bloqueadas. Navegar/assistir nunca passa por aqui —
+// isso é filtrado só pelo banimento TOTAL no middleware global.
+// =================================================================
+async function mensagemBloqueioCompra(nrIdTelegram, acao) {
+  try {
+    const { rows } = await pool.query('SELECT * FROM "BANS" WHERE nr_id_telegram = $1 LIMIT 1', [nrIdTelegram]);
+    const ban = rows[0];
+    if (!ban) return null;
+
+    const tipo = ban.tp_banimento ?? "TOTAL";
+    const mensagem = ban.ds_mensagem_bloqueio || "Sua conta está impossibilitada de realizar novas compras no momento.";
+
+    if (tipo === "TOTAL" || tipo === "COMPRAS") return mensagem;
+
+    if (tipo === "PERSONALIZADO") {
+      const acoes = ban.ds_acoes_bloqueadas || [];
+      if (acoes.includes("NOVAS_COMPRAS")) return mensagem;
+      if (acao === "ASSINATURA_PLANO" && acoes.includes("PLANOS")) return mensagem;
+    }
+
+    return null;
+  } catch (err) {
+    console.error("❌ Erro ao checar banimento de compra:", err.message);
+    return null; // Falha segura: não bloqueia por erro de checagem
   }
 }
 
@@ -2154,6 +2190,12 @@ app.post("/api/create-order", async (req, res) => {
   const { id_origem, nr_id_telegram, modalidade } = req.body;
 
   try {
+    const acaoCompra = modalidade === "ASSINATURA" ? "ASSINATURA_PLANO" : "COMPRA_GERAL";
+    const bloqueio = await mensagemBloqueioCompra(nr_id_telegram, acaoCompra);
+    if (bloqueio) {
+      return res.status(403).json({ error: bloqueio });
+    }
+
     let valor, titulo, insertData;
 
     if (modalidade === "ASSINATURA") {
