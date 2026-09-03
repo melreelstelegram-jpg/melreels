@@ -1616,70 +1616,93 @@ const gerarLinkScene = new Scenes.WizardScene(
 // =================================================================
 // 📢 FLUXO ADMIN: TRANSMISSÃO GLOBAL (BROADCAST)
 // =================================================================
+// Trava simples pra impedir dois disparos em massa simultâneos (broadcast
+// global e aviso por título são raros e não precisam rodar em paralelo —
+// evita que um admin nervoso, achando que travou, dispare de novo em cima
+// do envio anterior ainda em andamento).
+let transmissaoGlobalEmAndamento = false;
+const avisosSerieEmAndamento = new Set(); // cd_conteudo com envio em andamento
+
+function pareceCancelamento(texto) {
+  return texto.replace(/^\//, "").trim().toUpperCase() === "CANCELAR";
+}
+
 const transmitirAvisoScene = new Scenes.WizardScene(
   "TRANSMITIR_AVISO_SCENE",
-  
+
   async (ctx) => {
     await ctx.answerCbQuery().catch(()=>{});
     await ctx.reply("📢 **TRANSMISSÃO GLOBAL**\n\nEnvie a mensagem que você deseja disparar para **TODOS** os usuários que já usaram o bot:\n\n*(Ou digite CANCELAR para sair)*", { parse_mode: "Markdown" });
     return ctx.wizard.next();
   },
-  
+
   async (ctx) => {
     if (!ctx.message || !ctx.message.text) return;
     const mensagem = ctx.message.text;
 
-    if (mensagem.toUpperCase() === "CANCELAR") {
+    if (pareceCancelamento(mensagem)) {
       await ctx.reply("❌ Transmissão cancelada.");
       return ctx.scene.leave();
     }
 
-    const loadingMsg = await ctx.reply("⏳ Coletando lista de usuários no banco de dados...");
-
-    try {
-      // Coleta IDs únicos das tabelas SESSOES e VENDAS para garantir que vai para todo mundo
-      const { rows: sessoes } = await pool.query('SELECT nr_id_telegram FROM "SESSOES"');
-      const { rows: vendas } = await pool.query('SELECT nr_id_telegram FROM "VENDAS"');
-
-      const idsUnicos = new Set();
-      if (sessoes) sessoes.forEach(s => idsUnicos.add(s.nr_id_telegram));
-      if (vendas) vendas.forEach(v => idsUnicos.add(v.nr_id_telegram));
-
-      const usuarios = Array.from(idsUnicos);
-
-      if (usuarios.length === 0) {
-        await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-        await ctx.reply("❌ Nenhum usuário encontrado no banco de dados.");
-        return ctx.scene.leave();
-      }
-
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-      await ctx.reply(`🚀 Iniciando disparo para **${usuarios.length}** usuários.\nIsso pode levar alguns minutos...`, { parse_mode: "Markdown" });
-
-      let enviados = 0;
-      let falhas = 0;
-
-      // Função de delay para respeitar o limite do Telegram (30 mensagens por segundo)
-      const delay = (ms) => new Promise(res => setTimeout(res, ms));
-
-      for (const userId of usuarios) {
-        try {
-          // Tenta enviar a mensagem para o usuário
-          await bot.telegram.sendMessage(userId, mensagem, { parse_mode: "Markdown" });
-          enviados++;
-        } catch (e) {
-          // Se cair aqui, o usuário bloqueou o bot ou excluiu a conta
-          falhas++;
-        }
-        await delay(50); // Aguarda 50ms entre cada envio
-      }
-
-      await ctx.reply(`✅ **Transmissão Concluída!**\n\n📤 Enviados com sucesso: ${enviados}\n❌ Falhas (Bot bloqueado/apagado): ${falhas}`, { parse_mode: "Markdown" });
-
-    } catch (err) {
-      console.error("❌ [ERRO TRANSMISSÃO]:", err.message);
-      await ctx.reply("❌ Ocorreu um erro ao processar a transmissão.");
+    if (transmissaoGlobalEmAndamento) {
+      await ctx.reply("⏳ Já tem uma transmissão global em andamento — espera terminar antes de mandar outra, pra não duplicar mensagem pros clientes.");
+      return ctx.scene.leave();
     }
+
+    const adminChatId = ctx.chat.id;
+
+    // 🚀 Sai da scene JÁ, antes do envio em massa. O envio roda em segundo
+    // plano (pode levar vários minutos pra milhares de usuários) — sem isso,
+    // o admin ficava "preso" nessa cena até tudo terminar, e qualquer coisa
+    // que digitasse nesse meio tempo (achando que travou) virava um novo
+    // disparo em cima do que já estava rolando.
+    await ctx.reply("🚀 Transmissão entrou na fila e vai rodar em segundo plano — te aviso aqui quando terminar (pode levar alguns minutos dependendo da quantidade de usuários).");
+
+    transmissaoGlobalEmAndamento = true;
+    (async () => {
+      try {
+        // Coleta IDs únicos das tabelas SESSOES e VENDAS para garantir que vai para todo mundo
+        const { rows: sessoes } = await pool.query('SELECT nr_id_telegram FROM "SESSOES"');
+        const { rows: vendas } = await pool.query('SELECT nr_id_telegram FROM "VENDAS"');
+
+        const idsUnicos = new Set();
+        if (sessoes) sessoes.forEach(s => idsUnicos.add(s.nr_id_telegram));
+        if (vendas) vendas.forEach(v => idsUnicos.add(v.nr_id_telegram));
+
+        const usuarios = Array.from(idsUnicos);
+
+        if (usuarios.length === 0) {
+          await bot.telegram.sendMessage(adminChatId, "❌ Nenhum usuário encontrado no banco de dados.").catch(() => {});
+          return;
+        }
+
+        let enviados = 0;
+        let falhas = 0;
+        const delay = (ms) => new Promise(res => setTimeout(res, ms));
+
+        for (const userId of usuarios) {
+          try {
+            await bot.telegram.sendMessage(userId, mensagem, { parse_mode: "Markdown" });
+            enviados++;
+          } catch (e) {
+            falhas++; // Bot bloqueado/conta apagada
+          }
+          await delay(50); // Respeita o limite do Telegram (30 msgs/s)
+        }
+
+        await bot.telegram.sendMessage(
+          adminChatId,
+          `✅ **Transmissão Concluída!**\n\n📤 Enviados com sucesso: ${enviados}\n❌ Falhas (Bot bloqueado/apagado): ${falhas}`,
+          { parse_mode: "Markdown" }
+        ).catch(() => {});
+      } catch (err) {
+        console.error("❌ [ERRO TRANSMISSÃO]:", err.message);
+        await bot.telegram.sendMessage(adminChatId, "❌ Ocorreu um erro ao processar a transmissão.").catch(() => {});
+      } finally {
+        transmissaoGlobalEmAndamento = false;
+      }
+    })();
 
     return ctx.scene.leave();
   }
@@ -1688,6 +1711,8 @@ const transmitirAvisoScene = new Scenes.WizardScene(
 // =================================================================
 // 📢 FLUXO ADMIN: AVISO MANUAL PRA QUEM ASSISTE UMA SÉRIE ESPECÍFICA
 // =================================================================
+const REGEX_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const avisarSerieScene = new Scenes.WizardScene(
   "AVISAR_SERIE_SCENE",
 
@@ -1701,8 +1726,17 @@ const avisarSerieScene = new Scenes.WizardScene(
     if (!ctx.message || !ctx.message.text) return;
     const texto = ctx.message.text.trim();
 
-    if (texto.toUpperCase() === "CANCELAR") {
+    if (pareceCancelamento(texto)) {
       await ctx.reply("❌ Operação cancelada.");
+      return ctx.scene.leave();
+    }
+
+    // 🚀 Valida o formato ANTES de consultar — sem isso, mandar qualquer coisa
+    // que não fosse um UUID de verdade (um comando digitado sem querer, por
+    // exemplo) quebrava a query no banco sem tratamento e prendia a cena
+    // nesse passo pra sempre, engolindo todas as mensagens seguintes.
+    if (!REGEX_UUID.test(texto)) {
+      await ctx.reply("❌ Isso não parece um ID (UUID) válido. Operação cancelada — envie /admin pra tentar de novo.");
       return ctx.scene.leave();
     }
 
@@ -1726,23 +1760,32 @@ const avisarSerieScene = new Scenes.WizardScene(
     const mensagem = ctx.message.text;
     const { conteudoId, tituloConteudo } = ctx.wizard.state;
 
-    const loadingMsg = await ctx.reply("⏳ Buscando quem já assiste esse título...");
-
-    try {
-      const total = await avisarInteressados(conteudoId, mensagem);
-
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-
-      if (total === 0) {
-        await ctx.reply(`❌ Ninguém tem histórico ou compra aprovada de **"${tituloConteudo}"** ainda — nenhuma mensagem foi enviada.`, { parse_mode: "Markdown" });
-      } else {
-        await ctx.reply(`✅ **Aviso enviado!**\n\n📤 ${total} usuário(s) de **"${tituloConteudo}"** foram avisados.`, { parse_mode: "Markdown" });
-      }
-    } catch (err) {
-      console.error("❌ [ERRO AVISAR SÉRIE]:", err.message);
-      await ctx.telegram.deleteMessage(ctx.chat.id, loadingMsg.message_id).catch(() => {});
-      await ctx.reply("❌ Ocorreu um erro ao enviar o aviso.");
+    if (avisosSerieEmAndamento.has(conteudoId)) {
+      await ctx.reply(`⏳ Já tem um aviso em andamento pra **"${tituloConteudo}"** — espera terminar antes de mandar outro, pra não duplicar.`, { parse_mode: "Markdown" });
+      return ctx.scene.leave();
     }
+
+    const adminChatId = ctx.chat.id;
+
+    // 🚀 Sai da cena JÁ — o envio roda em segundo plano (pode levar minutos se
+    // o título tiver muitos espectadores) e o admin recebe o resultado
+    // quando terminar, sem ficar "preso" nesse passo o tempo todo.
+    await ctx.reply(`🚀 Aviso pra **"${tituloConteudo}"** entrou na fila — te aviso aqui quando terminar.`, { parse_mode: "Markdown" });
+
+    avisosSerieEmAndamento.add(conteudoId);
+    avisarInteressados(conteudoId, mensagem)
+      .then(async (total) => {
+        if (total === 0) {
+          await bot.telegram.sendMessage(adminChatId, `❌ Ninguém tem histórico ou compra aprovada de "${tituloConteudo}" ainda — nenhuma mensagem foi enviada.`).catch(() => {});
+        } else {
+          await bot.telegram.sendMessage(adminChatId, `✅ Aviso concluído!\n\n📤 ${total} usuário(s) de "${tituloConteudo}" foram avisados.`).catch(() => {});
+        }
+      })
+      .catch(async (err) => {
+        console.error("❌ [ERRO AVISAR SÉRIE]:", err.message);
+        await bot.telegram.sendMessage(adminChatId, `❌ Ocorreu um erro ao enviar o aviso pra "${tituloConteudo}".`).catch(() => {});
+      })
+      .finally(() => avisosSerieEmAndamento.delete(conteudoId));
 
     return ctx.scene.leave();
   }
