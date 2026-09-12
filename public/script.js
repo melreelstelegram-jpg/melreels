@@ -799,7 +799,7 @@ function abrirOpcoes(id, titulo, precoAluguel, precoVitalicio) {
 
   const modal = document.getElementById("custom-buy-modal");
   
-  document.getElementById("buy-modal-desc").innerText = `Acesso unicamente a: "${titulo}" Apenas!`;
+  document.getElementById("buy-modal-desc").innerText = `Como deseja acessar "${titulo}"?`;
   
   const btnVitalicio = document.getElementById("btn-buy-vitalicio");
   const btnAluguel = document.getElementById("btn-buy-aluguel");
