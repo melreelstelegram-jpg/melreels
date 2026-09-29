@@ -1379,22 +1379,31 @@ const criarPlanoScene = new Scenes.WizardScene(
   async (ctx) => {
     if (!ctx.message || !ctx.message.text) return;
     const dias = parseInt(ctx.message.text.trim());
-    const p = ctx.wizard.state.plano;
 
     if (isNaN(dias)) {
         await ctx.reply("❌ Validade inválida. Operação cancelada.");
         return ctx.scene.leave();
     }
 
+    ctx.wizard.state.plano.dias = dias;
+    await ctx.reply("É um plano **PROMOCIONAL**?\n\n*(Se for, cada cliente só consegue comprá-lo UMA VEZ na vida, mesmo depois que expirar — usado pra ofertas de entrada. Responda SIM ou NAO)*", { parse_mode: "Markdown" });
+    return ctx.wizard.next();
+  },
+  async (ctx) => {
+    if (!ctx.message || !ctx.message.text) return;
+    const resposta = ctx.message.text.trim().toLowerCase();
+    const p = ctx.wizard.state.plano;
+    const promocional = resposta === "sim";
+
     const loadingMsg = await ctx.reply("⏳ Criando plano no banco de dados...");
 
     try {
         await pool.query(
-            `INSERT INTO "PLANOS" (nm_plano, nm_categoria, vl_plano, nr_dias_validade) VALUES ($1, $2, $3, $4)`,
-            [p.nome, p.categoria, p.preco, dias]
+            `INSERT INTO "PLANOS" (nm_plano, nm_categoria, vl_plano, nr_dias_validade, sn_promocional) VALUES ($1, $2, $3, $4, $5)`,
+            [p.nome, p.categoria, p.preco, p.dias, promocional]
         );
 
-        await ctx.reply(`✅ **Plano Criado com Sucesso!**\n\n💎 Nome: ${p.nome}\n📂 Libera: ${p.categoria}\n💲 Preço: R$ ${p.preco.toFixed(2)}\n⏱ Validade: ${dias} dias\n\nEle já está aparecendo na aba PREMIUM do Mini App!`, { parse_mode: "Markdown" });
+        await ctx.reply(`✅ **Plano Criado com Sucesso!**\n\n💎 Nome: ${p.nome}\n📂 Libera: ${p.categoria}\n💲 Preço: R$ ${p.preco.toFixed(2)}\n⏱ Validade: ${p.dias} dias\n🎯 Promocional: ${promocional ? "SIM (compra única por cliente)" : "NÃO"}\n\nEle já está aparecendo na aba PREMIUM do Mini App!`, { parse_mode: "Markdown" });
     } catch(e) {
         console.error("❌ [ERRO CRIAR PLANO]:", e.message);
         await ctx.reply("❌ Erro ao criar o plano no banco de dados.");
@@ -1441,6 +1450,7 @@ const editarNomeCategoriaPlanoScene = new Scenes.WizardScene(
             inline_keyboard: [
                 [{ text: "✍️ Novo Nome", callback_data: "EDITAR_NM_PLANO" }],
                 [{ text: "📂 Nova Categoria", callback_data: "EDITAR_NM_CATEGORIA" }],
+                [{ text: "🎯 Alternar Promocional (Sim/Não)", callback_data: "TOGGLE_PROMOCIONAL" }],
                 [{ text: "❌ Cancelar", callback_data: "CANCELAR_EDIT_PLANO" }]
             ]
         }
@@ -1455,10 +1465,30 @@ const editarNomeCategoriaPlanoScene = new Scenes.WizardScene(
         return ctx.scene.leave();
     }
     const data = ctx.callbackQuery.data;
+    const { planoId } = ctx.wizard.state;
     await ctx.answerCbQuery();
 
     if (data === "CANCELAR_EDIT_PLANO") {
         await ctx.editMessageText("❌ Edição cancelada.");
+        return ctx.scene.leave();
+    }
+
+    if (data === "TOGGLE_PROMOCIONAL") {
+        try {
+            const { rows } = await pool.query(
+                `UPDATE "PLANOS" SET sn_promocional = NOT COALESCE(sn_promocional, false) WHERE cd_plano = $1 RETURNING sn_promocional, nm_plano`,
+                [planoId]
+            );
+            if (!rows[0]) {
+                await ctx.editMessageText("❌ Plano não encontrado. Verifique se o ID está correto.");
+            } else {
+                const { sn_promocional, nm_plano } = rows[0];
+                await ctx.editMessageText(`✅ **${nm_plano}** agora está marcado como Promocional: ${sn_promocional ? "SIM (compra única por cliente)" : "NÃO"}.`, { parse_mode: "Markdown" });
+            }
+        } catch (err) {
+            console.error("❌ ERRO TOGGLE PROMOCIONAL:", err.message);
+            await ctx.editMessageText("❌ Erro ao atualizar o plano no banco de dados.");
+        }
         return ctx.scene.leave();
     }
 
@@ -2211,6 +2241,16 @@ app.post("/api/create-order", async (req, res) => {
       const { rows: planoRows } = await pool.query('SELECT * FROM "PLANOS" WHERE cd_plano = $1 LIMIT 1', [id_origem]);
       const plano = planoRows[0];
       if (!plano) return res.status(404).json({ error: "Plano não encontrado." });
+
+      if (plano.sn_promocional) {
+        const { rows: jaComprou } = await pool.query(
+          `SELECT cd_venda FROM "VENDAS" WHERE nr_id_telegram = $1 AND cd_plano = $2 AND tp_status = $3 LIMIT 1`,
+          [nr_id_telegram, id_origem, "APROVADA"]
+        );
+        if (jaComprou.length > 0) {
+          return res.status(403).json({ error: "Você já utilizou essa promoção antes. Ela é válida apenas uma vez por cliente." });
+        }
+      }
 
       valor = plano.vl_plano;
       titulo = `Assinatura: ${plano.nm_plano}`;
