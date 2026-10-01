@@ -2243,12 +2243,15 @@ app.post("/api/create-order", async (req, res) => {
       if (!plano) return res.status(404).json({ error: "Plano não encontrado." });
 
       if (plano.sn_promocional) {
-        const { rows: jaComprou } = await pool.query(
-          `SELECT cd_venda FROM "VENDAS" WHERE nr_id_telegram = $1 AND cd_plano = $2 AND tp_status = $3 LIMIT 1`,
-          [nr_id_telegram, id_origem, "APROVADA"]
+        // Promocional (ex: "Primeiro Mês") é só pra quem NUNCA teve nenhuma
+        // assinatura — bloqueia independente de QUAL plano foi assinado antes,
+        // não só o mesmo cd_plano.
+        const { rows: jaAssinou } = await pool.query(
+          `SELECT cd_venda FROM "VENDAS" WHERE nr_id_telegram = $1 AND tp_compra = 'ASSINATURA' AND tp_status = $2 LIMIT 1`,
+          [nr_id_telegram, "APROVADA"]
         );
-        if (jaComprou.length > 0) {
-          return res.status(403).json({ error: "Você já utilizou essa promoção antes. Ela é válida apenas uma vez por cliente." });
+        if (jaAssinou.length > 0) {
+          return res.status(403).json({ error: "Essa promoção é válida apenas para quem nunca teve nenhuma assinatura." });
         }
       }
 
