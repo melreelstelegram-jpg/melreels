@@ -80,6 +80,36 @@ header h1 {
   text-transform: uppercase;
 }
 
+.quick-actions-bar {
+  display: flex;
+  gap: 8px;
+  margin: 0 15px 10px;
+}
+
+.quick-action-chip {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--glass);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  color: white;
+  padding: 10px 8px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.quick-action-chip i {
+  color: var(--main-red);
+  font-size: 13px;
+}
+
 /* --- PESQUISA GLASSMORPHISM --- */
 .search-container {
   background: var(--glass);
