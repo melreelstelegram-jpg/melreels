@@ -1307,6 +1307,59 @@ function openSupport() {
   tg.openTelegramLink("https://t.me/YarinTV");
 }
 
+function abrirMenuSuporte() {
+  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+  document.getElementById("support-menu-modal").style.display = "flex";
+}
+
+function fecharMenuSuporte() {
+  document.getElementById("support-menu-modal").style.display = "none";
+}
+
+function abrirSolicitarDrama() {
+  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+  document.getElementById("drama-title-input").value = "";
+  document.getElementById("drama-request-screen").style.display = "flex";
+}
+
+function fecharSolicitarDrama() {
+  document.getElementById("drama-request-screen").style.display = "none";
+}
+
+async function enviarSolicitacaoDrama() {
+  const input = document.getElementById("drama-title-input");
+  const titulo = input.value.trim();
+
+  if (!titulo) {
+    tg.showAlert("Digite o nome do drama antes de enviar.");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/solicitar-drama", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nr_id_telegram: userId, titulo }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      tg.showAlert(data.error || "Erro ao enviar seu pedido. Tente novamente.");
+      return;
+    }
+
+    if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+    fecharSolicitarDrama();
+    tg.showAlert(
+      data.duplicado
+        ? "Você já pediu esse título antes — já está na nossa lista! 🎬"
+        : "Pedido enviado! Obrigado, vamos levar em conta pra trazer novos títulos. 🎬"
+    );
+  } catch (e) {
+    tg.showAlert("Erro ao enviar seu pedido. Tente novamente.");
+  }
+}
+
 async function fetchUserStatus() {
     if (userId === 0) return;
     try {

@@ -2801,6 +2801,33 @@ app.get("/api/historico", async (req, res) => {
 });
 
 // =================================================================
+// 📩 SOLICITAÇÃO DE DRAMA — cliente pede um título que não tem no catálogo.
+// Pedidos repetidos da mesma pessoa pro mesmo título não contam de novo
+// (índice único no banco), pra ranking no painel admin não ser inflado.
+// =================================================================
+app.post("/api/solicitar-drama", async (req, res) => {
+    const { nr_id_telegram, titulo } = req.body;
+    const tituloLimpo = (titulo || "").trim();
+
+    if (!nr_id_telegram || !tituloLimpo) return res.status(400).json({ error: "Informe o título do drama." });
+    if (tituloLimpo.length > 150) return res.status(400).json({ error: "Título muito longo." });
+
+    try {
+        await pool.query(
+            `INSERT INTO "SOLICITACOES_DRAMA" (nr_id_telegram, ds_titulo) VALUES ($1, $2)`,
+            [nr_id_telegram, tituloLimpo]
+        );
+        res.json({ success: true });
+    } catch (e) {
+        if (e.code === "23505") { // unique_violation — já pediu esse título antes
+            return res.json({ success: true, duplicado: true });
+        }
+        console.error("❌ [ERRO SOLICITAR DRAMA]:", e.message);
+        res.status(500).json({ error: "Erro ao registrar o pedido." });
+    }
+});
+
+// =================================================================
 // 📺 API DE EPISÓDIOS (SÉRIES E CURSOS)
 // =================================================================
 app.get("/api/episodes", async (req, res) => {

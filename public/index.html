@@ -142,6 +142,42 @@
 		<div id="pagination-container" class="pagination"></div>
     </main>
 
+    <!-- Modal de Menu de Suporte (Falar com Suporte vs Solicitar Drama) -->
+    <div id="support-menu-modal" class="modal-overlay">
+        <div class="modal-content fade-in">
+            <h2 style="margin-bottom: 5px;">Suporte</h2>
+            <p style="color: var(--text-gray); font-size: 13px; margin-bottom: 20px;">
+                Como podemos te ajudar?
+            </p>
+            <button onclick="fecharMenuSuporte(); openSupport();" style="width: 100%; padding: 14px; background: var(--main-red); color: white; border: none; border-radius: 8px; font-weight: 900; margin-bottom: 10px; cursor: pointer;">
+                💬 FALAR COM SUPORTE
+            </button>
+            <button onclick="fecharMenuSuporte(); abrirSolicitarDrama();" style="width: 100%; padding: 14px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer;">
+                🎬 SOLICITAR UM DRAMA
+            </button>
+            <button onclick="fecharMenuSuporte()" class="btn-close" style="width: 100%; padding: 12px; background: transparent; color: var(--text-gray); border: none; font-weight: bold; cursor: pointer;">
+                CANCELAR
+            </button>
+        </div>
+    </div>
+
+    <!-- Tela dedicada: Solicitar Drama -->
+    <div id="drama-request-screen" class="drama-request-screen">
+        <div class="drama-request-header">
+            <button class="drama-request-back" onclick="fecharSolicitarDrama()"><i class="fas fa-arrow-left"></i></button>
+            <span>Solicitar Drama</span>
+        </div>
+        <div class="drama-request-body">
+            <div class="drama-request-icon"><i class="fas fa-clapperboard"></i></div>
+            <h2>Não achou o que procurava?</h2>
+            <p>Nos conta o nome do drama, filme ou série que você quer ver no Melreels. Damos preferência aos títulos mais pedidos na hora de trazer conteúdo novo!</p>
+            <input type="text" id="drama-title-input" maxlength="150" placeholder="Nome do drama..." class="drama-request-input" />
+            <button class="drama-request-submit" onclick="enviarSolicitacaoDrama()">
+                <i class="fas fa-paper-plane"></i> ENVIAR PEDIDO
+            </button>
+        </div>
+    </div>
+
     <!-- Modal de Seleção de Compra (Vitalício vs Aluguel) -->
     <div id="custom-buy-modal" class="modal-overlay">
         <div class="modal-content fade-in">
@@ -249,7 +285,7 @@
         <div class="nav-item" id="nav-bestsellers" onclick="switchTab('bestsellers')">
             <i class="fas fa-fire"></i><span>PREMIUM</span>
         </div>
-        <div class="nav-item" onclick="openSupport()">
+        <div class="nav-item" onclick="abrirMenuSuporte()">
             <i class="fas fa-headset"></i><span>SUPORTE</span>
         </div>
     </nav>
