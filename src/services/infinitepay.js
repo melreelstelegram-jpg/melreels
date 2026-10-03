@@ -60,12 +60,20 @@ async function gerarLink(valor, titulo, userId, idOrigem, modalidade) {
   };
 }
 
-async function consultarPagamento(orderNsu) {
+/** Testado na prática: o /payment_check só confirma de verdade quando
+ * order_nsu, transactionNsu E slug são enviados juntos — só com order_nsu
+ * ele sempre devolve {success:false}, mesmo pra pagamento já aprovado.
+ * transactionNsu/slug só existem depois do pagamento (vêm no webhook). */
+async function consultarPagamento(orderNsu, { transactionNsu, slug } = {}) {
   try {
+    const body = { handle: HANDLE, order_nsu: orderNsu };
+    if (transactionNsu) body.transaction_nsu = transactionNsu;
+    if (slug) body.slug = slug;
+
     const res = await fetch(`${BASE_URL}/payment_check`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ handle: HANDLE, order_nsu: orderNsu }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) return null;
     return await res.json(); // { success, paid, amount, paid_amount, installments, capture_method }

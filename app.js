@@ -2277,13 +2277,15 @@ async function gerarPixComFallback(valor, titulo, userId, idOrigem, modalidade) 
 async function consultarPixUnificado(txid) {
   if (!txid) return null;
 
-  // Prefixo "IP-" identifica um order_nsu da InfinitePay
+  // Prefixo "IP-" identifica um order_nsu da InfinitePay. O /payment_check
+  // deles só confirma de verdade quando mandamos junto transaction_nsu e
+  // slug (testado na prática — só com order_nsu ele sempre devolve
+  // {success:false}, mesmo pra pagamento já aprovado), e esses dois campos
+  // só existem DEPOIS do pagamento, vindos do webhook. Então essa consulta
+  // de "auto-cura" aqui não funciona pra InfinitePay — a aprovação depende
+  // só do /webhook-infinitepay mesmo.
   if (String(txid).startsWith("IP-")) {
-    const ipInfo = await infinitepayService.consultarPagamento(txid);
-    if (ipInfo?.paid) {
-      return { status: "CONCLUIDA", provider: "INFINITEPAY", raw: ipInfo };
-    }
-    return { status: ipInfo?.success ? "PENDENTE" : null, provider: "INFINITEPAY", raw: ipInfo };
+    return { status: "PENDENTE", provider: "INFINITEPAY", raw: null };
   }
 
   // Se o TXID é numérico (ex: "181175315263"), é do Mercado Pago
@@ -3059,20 +3061,24 @@ app.post(["/webhook-mp", "/webhook/mercadopago"], async (req, res) => {
   }
 });
 
-// Webhook InfinitePay — payload chega só quando o pagamento é confirmado,
-// mas não existe assinatura documentada pra validar a origem da chamada,
-// então reconfirma direto na API (/payment_check) antes de aprovar, em vez
-// de confiar cegamente no corpo recebido.
+// Webhook InfinitePay — a doc deles diz que esse payload só chega quando o
+// pagamento é CONFIRMADO (não existe assinatura documentada pra validar a
+// origem da chamada, então o corpo recebido é a própria fonte de verdade).
+// Tentativa anterior de reconfirmar via /payment_check antes de aprovar
+// falhava silenciosamente (a resposta de lá não trazia "paid: true" mesmo
+// pra pagamentos já confirmados pelo webhook) e travava a liberação.
 app.post("/webhook-infinitepay", async (req, res) => {
   console.log("🔔 [WEBHOOK INFINITEPAY] Notificação recebida:", JSON.stringify(req.body));
   res.sendStatus(200);
 
   try {
-    const orderNsu = req.body?.order_nsu;
+    const { order_nsu: orderNsu, amount, paid_amount: paidAmount } = req.body || {};
     if (!orderNsu) return;
 
-    const info = await infinitepayService.consultarPagamento(orderNsu);
-    if (!info?.paid) return;
+    if (!(Number(paidAmount) >= Number(amount))) {
+      console.warn(`⚠️ [INFINITEPAY] Webhook pra ${orderNsu} com paid_amount (${paidAmount}) menor que amount (${amount}) — ignorando.`);
+      return;
+    }
 
     const { rows: vendaRows } = await pool.query(
       `SELECT v.*, p.nr_dias_validade AS "planoDiasValidade"
