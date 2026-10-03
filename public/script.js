@@ -896,8 +896,7 @@ function fecharModalCompra() {
   document.getElementById("custom-buy-modal").style.display = "none";
 }
 
-// Fica checando /api/check-payment até aprovar — usado tanto pelo fluxo de
-// QR Code inline (EFÍ/MP) quanto pelo link de checkout externo (InfinitePay).
+// Fica checando /api/check-payment até aprovar, enquanto o QR Code tá na tela.
 function iniciarPollingPagamento(modalidade, id) {
   clearInterval(paymentPollingInterval);
   paymentPollingInterval = setInterval(async () => {
@@ -918,7 +917,6 @@ function iniciarPollingPagamento(modalidade, id) {
 
     // Atualiza as telas do modal
     document.getElementById("qr-code-section").style.display = "none";
-    document.getElementById("link-pix-section").style.display = "none";
     document.getElementById("success-section").style.display = "block";
 
     // 🚀 AQUI ENTRA A MUDANÇA DO SINO DE NOTIFICAÇÃO:
@@ -965,25 +963,21 @@ async function processarCompra(id, titulo, modalidade, valorFinal) {
     });
     const result = await res.json();
 
-    if (result.success && result.link) {
-      // Fallback: InfinitePay — não tem QR inline, abre um link de checkout externo.
+    if (result.success && result.manual) {
+      // Fallback: EFÍ e Mercado Pago falharam os dois — mostra a chave Pix manual.
       document.getElementById("qr-code-section").style.display = "none";
       document.getElementById("success-section").style.display = "none";
-      document.getElementById("link-pix-section").style.display = "block";
-      document.getElementById("link-pix-price").innerText = `R$ ${parseFloat(valorFinal).toFixed(2).replace('.', ',')}`;
-      document.getElementById("link-pix-title").innerText = titulo;
+      document.getElementById("manual-pix-section").style.display = "block";
+      document.getElementById("manual-pix-price").innerText = `R$ ${parseFloat(valorFinal).toFixed(2).replace('.', ',')}`;
       document.getElementById("payment-modal").style.display = "flex";
 
-      document.getElementById("btn-abrir-link-pagamento").onclick = () => tg.openLink(result.link);
-
-      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
-      iniciarPollingPagamento(modalidade, id);
+      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("warning");
     } else if (result.success) {
       currentPixCode = result.qrCode;
 
       // Reseta as telas do modal
       document.getElementById("qr-code-section").style.display = "block";
-      document.getElementById("link-pix-section").style.display = "none";
+      document.getElementById("manual-pix-section").style.display = "none";
       document.getElementById("success-section").style.display = "none";
 
       const promoBadge = document.getElementById("payment-promo-badge");
@@ -1379,6 +1373,18 @@ function copyPixCode() {
 function closePaymentModal() {
   clearInterval(paymentPollingInterval);
   document.getElementById("payment-modal").style.display = "none";
+}
+
+function copyManualPixKey() {
+  const el = document.createElement("textarea");
+  el.value = "pix@yarinshorts.online";
+  document.body.appendChild(el);
+  el.select();
+  document.execCommand("copy");
+  document.body.removeChild(el);
+
+  if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+  tg.showAlert("✅ Chave Pix Copiada com Sucesso!");
 }
 
 function irParaMinhaLista() {

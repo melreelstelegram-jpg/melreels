@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Melreels — a video streaming platform delivered as a Telegram Mini App (WebApp), with a Telegram bot as the admin/content-management interface. Node.js/Express backend, plain PostgreSQL (via `pg` Pool, no BaaS layer) for data, PIX (Brazilian instant payment) for checkout via a three-way fallback chain: EFI Bank (primary) → MercadoPago (backup) → InfinitePay (2nd backup). Deployed on Railway.
+Melreels — a video streaming platform delivered as a Telegram Mini App (WebApp), with a Telegram bot as the admin/content-management interface. Node.js/Express backend, plain PostgreSQL (via `pg` Pool, no BaaS layer) for data, PIX (Brazilian instant payment) for checkout via EFI Bank (primary), MercadoPago (backup), falling back further to a manual Pix key if both fail. Deployed on Railway.
 
 ## Commands
 
@@ -18,7 +18,6 @@ Melreels — a video streaming platform delivered as a Telegram Mini App (WebApp
 - `src/services/db.js` — `pg` `Pool` singleton built from `DATABASE_URL` (throws at import time if missing). SSL is enabled automatically unless the connection string points at `localhost`/`127.0.0.1` (needed for managed Postgres like Railway's). All DB access in `app.js` goes through this pool with parameterized queries (`$1, $2...`) — table names are always double-quoted (`"CONTEUDOS"`, `"VENDAS"`, etc.) since they were originally created with mixed-case identifiers. There is no ORM; Supabase-style embedded selects (e.g. `.select("*, PLANOS(nm_plano)")`) were translated to explicit `LEFT JOIN`s with aliased columns.
 - `src/services/efiService.js` — EFI Bank PIX integration (`sdk-node-apis-efi`), uses `certificado.p12` at repo root for mTLS.
 - `src/services/mercadopago.js` — MercadoPago PIX integration, used as a backup payment path.
-- `src/services/infinitepay.js` — InfinitePay integration, 2nd backup. Unlike EFI/MercadoPago it has no direct QR/copia-e-cola API — `gerarLink()` creates a hosted checkout link (`POST /links` on `api.checkout.infinitepay.io`) the customer is redirected to; confirmation comes via `POST /webhook-infinitepay` or by polling `/payment_check`. Auth is just the account's InfiniteTag (`INFINITEPAY_HANDLE` env var, no API key/secret, no documented sandbox). Its generated `order_nsu` (stored as `ds_txid`) is prefixed `IP-` so `consultarPixUnificado()` in `app.js` can tell it apart from EFI's alphanumeric txid and MercadoPago's numeric one. If all three providers fail, `/api/create-order` throws and the purchase simply fails.
 
 `app.js` is organized into five numbered sections (search for `// N. ...` banner comments):
 1. **In-memory cache** — `catalogCache` (30s TTL) for the catalog endpoint, plus `resolveVideoUrl()` which checks `STORAGE_PATH_1`/`STORAGE_PATH_2` (env, full base URLs like `https://media.melreels.com.br/filmes`) via an HTTP `HEAD` request to locate "local" video files. These aren't local disk paths anymore — they're HDs on a home PC exposed through a Cloudflare Tunnel, since the app itself runs on Railway.
@@ -48,11 +47,11 @@ Melreels — a video streaming platform delivered as a Telegram Mini App (WebApp
 - `GET /api/user-status?userId=` — VIP/subscription status.
 - `GET /api/my-contents?userId=` — content the user can access.
 - `GET /api/plans` — subscription plans.
-- `POST /api/create-order` — generates a PIX charge via `gerarPixComFallback()` (EFI → MercadoPago → InfinitePay).
+- `POST /api/create-order` — generates a PIX charge via `gerarPixComFallback()` (EFI → MercadoPago); if both fail, falls back to a manual Pix key shown in the Mini App.
 - `GET /api/check-payment` — checks payment status (DB first, falling back to polling via `consultarPixUnificado()`, which dispatches by provider).
 - `GET /api/smart-stream`, `GET /api/video/:filename`, `GET /api/episodes?conteudoId=` — playback.
 - `POST /api/heartbeat`, `POST/GET /api/historico` — watch-progress tracking ("continue watching").
-- `POST /webhook-efi`, `POST /webhook-mp` (alias `/webhook/mercadopago`), `POST /webhook-infinitepay` — payment webhooks, one per provider.
+- `POST /webhook-efi`, `POST /webhook-mp` (alias `/webhook/mercadopago`) — payment webhooks, one per provider.
 
 ### Channel content-automation format
 

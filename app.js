@@ -7,7 +7,6 @@ import FormData from "form-data";
 import { Composer, Markup, Scenes, Telegraf } from "telegraf";
 import efiService from "./src/services/efiService.js";
 import mpService from "./src/services/mercadopago.js";
-import infinitepayService from "./src/services/infinitepay.js";
 import pool from "./src/services/db.js";
 
 const app = express();
@@ -2226,13 +2225,33 @@ app.get("/api/plans", async (req, res) => {
   }
 });
 
+// Chave Pix manual — último recurso quando EFÍ e Mercado Pago falham os
+// dois. Cliente paga direto nessa chave e manda o comprovante pro suporte,
+// que libera manualmente (Gerenciar Cliente no /admin).
+const PIX_MANUAL_CHAVE = "pix@yarinshorts.online";
+
+/** Registra a venda como PENDENTE sem txid (ninguém confirma sozinho —
+ * depende do admin liberar na mão depois de ver o comprovante). */
+async function criarVendaManual(insertData) {
+  const vendaData = { ...insertData, tp_status: "PENDENTE" };
+  const colunas = Object.keys(vendaData);
+  const placeholders = colunas.map((_, i) => `$${i + 1}`).join(", ");
+  try {
+    await pool.query(
+      `INSERT INTO "VENDAS" (${colunas.join(", ")}) VALUES (${placeholders})`,
+      colunas.map(col => vendaData[col])
+    );
+  } catch (dbError) {
+    console.error("❌ [ERRO DB] Falha ao salvar venda manual (Pix na mão):", dbError.message);
+  }
+}
+
 // =================================================================
-// HELPER DE PAGAMENTO UNIFICADO (Efí Bank -> Mercado Pago -> InfinitePay)
+// HELPER DE PAGAMENTO UNIFICADO (Efí Bank com Fallback para Mercado Pago)
 // =================================================================
 async function gerarPixComFallback(valor, titulo, userId, idOrigem, modalidade) {
   let pix = null;
   let efiErrorLog = null;
-  let mpErrorLog = null;
 
   // 1. Tenta Efí Bank
   try {
@@ -2255,38 +2274,16 @@ async function gerarPixComFallback(valor, titulo, userId, idOrigem, modalidade) 
     return pix;
   } catch (mpErr) {
     const rawCause = mpErr?.cause;
-    mpErrorLog = rawCause
+    const mpErrorLog = rawCause
       ? (typeof rawCause === "object" ? JSON.stringify(rawCause) : rawCause)
       : (mpErr?.message || JSON.stringify(mpErr));
-    console.error(`❌ [MERCADO PAGO] Falha ao gerar PIX (${mpErrorLog}). Acionando fallback da InfinitePay...`);
-  }
-
-  // 3. Fallback InfinitePay (link de checkout, não é QR/copia-e-cola direto)
-  try {
-    console.log("⏳ [INFINITEPAY] Solicitando link de checkout via fallback...");
-    pix = await infinitepayService.gerarLink(valor, titulo, userId, idOrigem, modalidade);
-    console.log(`✅ [INFINITEPAY] Link de checkout criado com sucesso! NSU: ${pix.txid}`);
-    return pix;
-  } catch (ipErr) {
-    const ipErrorLog = ipErr?.message || JSON.stringify(ipErr);
-    console.error("❌ [INFINITEPAY] Falha ao gerar link:", ipErrorLog);
-    throw new Error(`Erro nos meios de pagamento (Efí: ${efiErrorLog} | MP: ${mpErrorLog} | InfinitePay: ${ipErrorLog})`);
+    console.error("❌ [MERCADO PAGO] Falha ao gerar PIX:", mpErrorLog);
+    throw new Error(`Erro nos meios de pagamento (Efí: ${efiErrorLog} | MP: ${mpErrorLog})`);
   }
 }
 
 async function consultarPixUnificado(txid) {
   if (!txid) return null;
-
-  // Prefixo "IP-" identifica um order_nsu da InfinitePay. O /payment_check
-  // deles só confirma de verdade quando mandamos junto transaction_nsu e
-  // slug (testado na prática — só com order_nsu ele sempre devolve
-  // {success:false}, mesmo pra pagamento já aprovado), e esses dois campos
-  // só existem DEPOIS do pagamento, vindos do webhook. Então essa consulta
-  // de "auto-cura" aqui não funciona pra InfinitePay — a aprovação depende
-  // só do /webhook-infinitepay mesmo.
-  if (String(txid).startsWith("IP-")) {
-    return { status: "PENDENTE", provider: "INFINITEPAY", raw: null };
-  }
 
   // Se o TXID é numérico (ex: "181175315263"), é do Mercado Pago
   if (/^\d+$/.test(String(txid))) {
@@ -2349,8 +2346,22 @@ app.post("/api/create-order", async (req, res) => {
       insertData = { cd_conteudo: id_origem, nr_id_telegram, tp_compra: modalidade };
     }
 
-    // 🎯 1. GERAR PIX COM FALLBACK (EFÍ -> MERCADO PAGO -> INFINITEPAY)
-    const pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
+    // 🎯 1. GERAR PIX COM FALLBACK (EFÍ -> MERCADO PAGO)
+    let pix;
+    try {
+      pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
+    } catch (pixError) {
+      // Os dois provedores falharam — cai pro Pix manual em vez de travar a compra.
+      console.error("❌ [CREATE-ORDER] EFÍ e Mercado Pago falharam, caindo pro Pix manual:", pixError?.message || pixError);
+      await criarVendaManual(insertData);
+      return res.json({
+        success: true,
+        manual: true,
+        pixKey: PIX_MANUAL_CHAVE,
+        valor,
+        titulo,
+      });
+    }
 
     // 🎯 2. SALVA O TXID NA VENDA (Protegido com logs claros)
     const vendaData = { ...insertData, tp_status: "PENDENTE", ds_txid: pix.txid };
@@ -2369,14 +2380,6 @@ app.post("/api/create-order", async (req, res) => {
     }
 
     // 🎯 3. DEVOLVE PRA TELA DO CLIENTE
-    if (pix.link) {
-      // InfinitePay: não tem QR/copia-e-cola, é um link hospedado pro cliente pagar.
-      return res.json({
-        success: true,
-        link: pix.link,
-      });
-    }
-
     // Limpeza de string segura (Evita crash de undefined/split)
     let base64Code = pix.qrCode || "";
     if (base64Code.includes(",")) {
@@ -3061,70 +3064,6 @@ app.post(["/webhook-mp", "/webhook/mercadopago"], async (req, res) => {
   }
 });
 
-// Webhook InfinitePay — a doc deles diz que esse payload só chega quando o
-// pagamento é CONFIRMADO (não existe assinatura documentada pra validar a
-// origem da chamada, então o corpo recebido é a própria fonte de verdade).
-// Tentativa anterior de reconfirmar via /payment_check antes de aprovar
-// falhava silenciosamente (a resposta de lá não trazia "paid: true" mesmo
-// pra pagamentos já confirmados pelo webhook) e travava a liberação.
-app.post("/webhook-infinitepay", async (req, res) => {
-  console.log("🔔 [WEBHOOK INFINITEPAY] Notificação recebida:", JSON.stringify(req.body));
-  res.sendStatus(200);
-
-  try {
-    const { order_nsu: orderNsu, amount, paid_amount: paidAmount } = req.body || {};
-    if (!orderNsu) return;
-
-    if (!(Number(paidAmount) >= Number(amount))) {
-      console.warn(`⚠️ [INFINITEPAY] Webhook pra ${orderNsu} com paid_amount (${paidAmount}) menor que amount (${amount}) — ignorando.`);
-      return;
-    }
-
-    const { rows: vendaRows } = await pool.query(
-      `SELECT v.*, p.nr_dias_validade AS "planoDiasValidade"
-       FROM "VENDAS" v
-       LEFT JOIN "PLANOS" p ON p.cd_plano = v.cd_plano
-       WHERE v.ds_txid = $1 AND v.tp_status = $2
-       LIMIT 1`,
-      [orderNsu, "PENDENTE"]
-    );
-    const venda = vendaRows[0];
-    if (!venda) return;
-
-    const type = venda.tp_compra;
-    let diasValidade = type === "ALUGUEL" ? 7 : type === "VITALICIO" ? 18250 : 30;
-    if (type === "ASSINATURA" && venda.planoDiasValidade) {
-      diasValidade = venda.planoDiasValidade;
-    }
-
-    const ts_expiracao = new Date();
-    ts_expiracao.setDate(ts_expiracao.getDate() + diasValidade);
-
-    await pool.query(
-      'UPDATE "VENDAS" SET tp_status = $1, ts_expiracao = $2 WHERE ds_txid = $3',
-      ["APROVADA", ts_expiracao.toISOString(), orderNsu]
-    );
-
-    catalogCache.data = null;
-    console.log(`✅ [INFINITEPAY] Venda APROVADA via Webhook! NSU: ${orderNsu}`);
-
-    const textoAcesso = (venda.tp_compra === "ASSINATURA")
-      ? "Seu **Acesso Premium** foi liberado! 👑"
-      : "Seu **Filme** foi liberado com sucesso! 🎬";
-
-    await bot.telegram.sendMessage(
-      venda.nr_id_telegram,
-      `🎉 **PAGAMENTO CONFIRMADO!**\n\n${textoAcesso}\nAbra o aplicativo e confira a aba **MINHA LISTA** para assistir agora! 🍿`,
-      {
-        parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: [[{ text: "🚀 ABRIR MELREELS", web_app: { url: process.env.WEBAPP_URL } }]] }
-      }
-    ).catch(() => console.log("⚠️ Cliente bloqueou o bot."));
-  } catch (error) {
-    console.error("❌ Erro ao processar Webhook InfinitePay:", error.message || error);
-  }
-});
-
 // =================================================================
 // 4. LÓGICA DO BOT (COMANDOS E EVENTOS)
 // =================================================================
@@ -3681,7 +3620,18 @@ bot.action("UPSELL_CONTINUAR_COMPRA", async (ctx) => {
           insertData = { cd_conteudo: id_origem, nr_id_telegram, tp_compra: modalidade };
       }
 
-      const pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
+      let pix;
+      try {
+        pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
+      } catch (pixError) {
+        console.error("❌ [UPSELL] EFÍ e Mercado Pago falharam, caindo pro Pix manual:", pixError?.message || pixError);
+        await criarVendaManual(insertData);
+        await ctx.reply(
+          `⚠️ Nosso pagamento automático está instável no momento.\n\n🍿 **Item: ${titulo}**\n💰 Valor: R$ ${valor.toFixed(2).replace('.', ',')}\n\nFaça o Pix manualmente pra chave:\n\`${PIX_MANUAL_CHAVE}\`\n\nDepois envie o **comprovante pro suporte** que liberamos seu acesso na mão.`,
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
 
       const vendaData2 = { ...insertData, tp_status: "PENDENTE", ds_txid: pix.txid };
       const vendaColunas2 = Object.keys(vendaData2);
@@ -3726,7 +3676,18 @@ bot.action(/COMPRAR_PLANO_(.+)/, async (ctx) => {
       let valor = plano.vl_plano;
       let titulo = `Assinatura: ${plano.nm_plano}`;
 
-      const pix = await gerarPixComFallback(valor, titulo, userId, planId, "ASSINATURA");
+      let pix;
+      try {
+        pix = await gerarPixComFallback(valor, titulo, userId, planId, "ASSINATURA");
+      } catch (pixError) {
+        console.error("❌ [COMPRAR_PLANO] EFÍ e Mercado Pago falharam, caindo pro Pix manual:", pixError?.message || pixError);
+        await criarVendaManual({ cd_plano: planId, nr_id_telegram: userId, tp_compra: "ASSINATURA" });
+        await ctx.reply(
+          `⚠️ Nosso pagamento automático está instável no momento.\n\n👑 **Plano: ${plano.nm_plano}**\n💰 Valor: R$ ${valor.toFixed(2).replace('.', ',')}\n\nFaça o Pix manualmente pra chave:\n\`${PIX_MANUAL_CHAVE}\`\n\nDepois envie o **comprovante pro suporte** que liberamos seu acesso na mão.`,
+          { parse_mode: "Markdown" }
+        );
+        return;
+      }
 
       await pool.query(
           `INSERT INTO "VENDAS" (cd_plano, nr_id_telegram, tp_compra, tp_status, ds_txid) VALUES ($1, $2, $3, $4, $5)`,
