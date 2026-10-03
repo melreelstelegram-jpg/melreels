@@ -6,6 +6,7 @@ import express from "express";
 import FormData from "form-data";
 import { Composer, Markup, Scenes, Telegraf } from "telegraf";
 import efiService from "./src/services/efiService.js";
+import mpService from "./src/services/mercadopago.js";
 import pool from "./src/services/db.js";
 
 const app = express();
@@ -2224,7 +2225,60 @@ app.get("/api/plans", async (req, res) => {
   }
 });
 
-// Create-Order (Híbrido) Efí Bank
+// =================================================================
+// HELPER DE PAGAMENTO UNIFICADO (Efí Bank com Fallback para Mercado Pago)
+// =================================================================
+async function gerarPixComFallback(valor, titulo, userId, idOrigem, modalidade) {
+  let pix = null;
+  let efiErrorLog = null;
+
+  // 1. Tenta Efí Bank
+  try {
+    console.log("⏳ [EFÍ] Solicitando criação da cobrança...");
+    pix = await efiService.gerarPix(valor, titulo, userId, idOrigem, modalidade);
+    return pix;
+  } catch (err) {
+    efiErrorLog = err?.mensagem || err?.message || JSON.stringify(err);
+    console.warn(`⚠️ [EFÍ] Falha ao gerar PIX (${efiErrorLog}). Acionando fallback do Mercado Pago...`);
+  }
+
+  // 2. Fallback Mercado Pago
+  try {
+    console.log("⏳ [MERCADO PAGO] Solicitando criação da cobrança via fallback...");
+    pix = await mpService.gerarPix(valor, titulo, userId, idOrigem, modalidade);
+    if (!pix) {
+      throw new Error("Mercado Pago retornou nulo.");
+    }
+    console.log(`✅ [MERCADO PAGO] PIX criado com sucesso! ID: ${pix.txid}`);
+    return pix;
+  } catch (mpErr) {
+    const mpErrorLog = mpErr?.cause || mpErr?.message || JSON.stringify(mpErr);
+    console.error("❌ [MERCADO PAGO] Falha ao gerar PIX:", mpErrorLog);
+    throw new Error(`Erro nos meios de pagamento (Efí: ${efiErrorLog} | MP: ${mpErrorLog})`);
+  }
+}
+
+async function consultarPixUnificado(txid) {
+  if (!txid) return null;
+
+  // Se o TXID é numérico (ex: "181175315263"), é do Mercado Pago
+  if (/^\d+$/.test(String(txid))) {
+    const mpInfo = await mpService.consultarPix(txid);
+    if (mpInfo && (mpInfo.status === "approved" || mpInfo.status === "approved_detail")) {
+      return { status: "CONCLUIDA", provider: "MERCADOPAGO", raw: mpInfo };
+    }
+    return { status: mpInfo?.status || "PENDENTE", provider: "MERCADOPAGO", raw: mpInfo };
+  }
+
+  // Se é alfanumérico, é da Efí Bank
+  const efiInfo = await efiService.consultarPix(txid);
+  if (efiInfo) {
+    return { status: efiInfo.status, provider: "EFI", raw: efiInfo };
+  }
+  return null;
+}
+
+// Create-Order (Híbrido) Efí Bank + Fallback Mercado Pago
 app.post("/api/create-order", async (req, res) => {
   const { id_origem, nr_id_telegram, modalidade } = req.body;
 
@@ -2268,8 +2322,8 @@ app.post("/api/create-order", async (req, res) => {
       insertData = { cd_conteudo: id_origem, nr_id_telegram, tp_compra: modalidade };
     }
 
-    // 🎯 1. CHAMA A EFÍ AQUI
-    const pix = await efiService.gerarPix(valor, titulo, nr_id_telegram, id_origem, modalidade);
+    // 🎯 1. GERAR PIX COM FALLBACK (EFÍ -> MERCADO PAGO)
+    const pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
 
     // 🎯 2. SALVA O TXID NA VENDA (Protegido com logs claros)
     const vendaData = { ...insertData, tp_status: "PENDENTE", ds_txid: pix.txid };
@@ -2301,12 +2355,13 @@ app.post("/api/create-order", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("❌ [ERRO CREATE-ORDER]:", error.message);
+    const detail = error?.mensagem || error?.message || JSON.stringify(error);
+    console.error("❌ [ERRO CREATE-ORDER]:", detail);
     res.status(500).json({ error: "Erro interno ao gerar o pagamento. Olhe os logs do PM2." });
   }
 });
 
-// Rota de Checagem (Com Auto-Cura pela Efí)
+// Rota de Checagem (Com Auto-Cura por Polling Efí / Mercado Pago)
 app.get("/api/check-payment", async (req, res) => {
   const { userId, contentId, planId } = req.query;
   
@@ -2325,7 +2380,7 @@ app.get("/api/check-payment", async (req, res) => {
       return res.json({ approved: true });
     }
 
-    // 2. Se NÃO está aprovada, busca a venda PENDENTE para perguntar pra Efí (A Mágica da Redundância)
+    // 2. Se NÃO está aprovada, busca a venda PENDENTE para perguntar pro gateway (A Mágica da Redundância)
     const pendenteParams = [userId, "PENDENTE"];
     let pendenteWhere = `v.nr_id_telegram = $1 AND v.tp_status = $2`;
     if (contentId) { pendenteParams.push(contentId); pendenteWhere += ` AND v.cd_conteudo = $${pendenteParams.length}`; }
@@ -2343,11 +2398,11 @@ app.get("/api/check-payment", async (req, res) => {
     if (pendentes && pendentes.length > 0) {
       const venda = pendentes[0];
       
-      // Se a venda tem um TXID, vamos perguntar direto pro banco Efí!
+      // Se a venda tem um TXID, vamos perguntar pro Gateway de pagamento!
       if (venda.ds_txid) {
-        const infoPix = await efiService.consultarPix(venda.ds_txid);
+        const infoPix = await consultarPixUnificado(venda.ds_txid);
         
-        // Se a Efí disser que foi CONCLUÍDA (dinheiro na conta), forçamos a aprovação!
+        // Se disser que foi CONCLUÍDA (dinheiro na conta), forçamos a aprovação!
         if (infoPix && infoPix.status === "CONCLUIDA") {
            console.log(`🛡️ [REDUNDÂNCIA] Webhook falhou, mas o Polling salvou a venda! TXID: ${venda.ds_txid}`);
            
@@ -2908,6 +2963,69 @@ app.post("/webhook-efi", async (req, res) => {
   }
 });
 
+// Webhook Mercado Pago
+app.post(["/webhook-mp", "/webhook/mercadopago"], async (req, res) => {
+  console.log("🔔 [WEBHOOK MP] Notificação do Mercado Pago recebida:", JSON.stringify({ query: req.query, body: req.body }));
+  res.sendStatus(200);
+
+  try {
+    const paymentId = req.body?.data?.id || req.query?.id || req.body?.id;
+    const action = req.body?.action || req.body?.type || req.query?.topic;
+
+    if (paymentId && (action === "payment" || action === "payment.updated" || action === "payment.created" || !action)) {
+      const paymentInfo = await mpService.consultarPix(paymentId);
+      if (paymentInfo && (paymentInfo.status === "approved" || paymentInfo.status === "approved_detail")) {
+        const txidPago = String(paymentId);
+
+        const { rows: vendaRows } = await pool.query(
+          `SELECT v.*, p.nr_dias_validade AS "planoDiasValidade"
+           FROM "VENDAS" v
+           LEFT JOIN "PLANOS" p ON p.cd_plano = v.cd_plano
+           WHERE v.ds_txid = $1 AND v.tp_status = $2
+           LIMIT 1`,
+          [txidPago, "PENDENTE"]
+        );
+        const venda = vendaRows[0];
+
+        if (!venda) return;
+
+        const type = venda.tp_compra;
+        let diasValidade = type === "ALUGUEL" ? 7 : type === "VITALICIO" ? 18250 : 30;
+
+        if (type === "ASSINATURA" && venda.planoDiasValidade) {
+          diasValidade = venda.planoDiasValidade;
+        }
+
+        const ts_expiracao = new Date();
+        ts_expiracao.setDate(ts_expiracao.getDate() + diasValidade);
+
+        await pool.query(
+          'UPDATE "VENDAS" SET tp_status = $1, ts_expiracao = $2 WHERE ds_txid = $3',
+          ["APROVADA", ts_expiracao.toISOString(), txidPago]
+        );
+
+        catalogCache.data = null;
+        console.log(`✅ [MERCADO PAGO] Venda APROVADA via Webhook! TXID: ${txidPago}`);
+
+        const textoAcesso = (venda.tp_compra === "ASSINATURA") 
+          ? "Seu **Acesso Premium** foi liberado! 👑" 
+          : "Seu **Filme** foi liberado com sucesso! 🎬";
+
+        await bot.telegram.sendMessage(
+          venda.nr_id_telegram,
+          `🎉 **PAGAMENTO CONFIRMADO!**\n\n${textoAcesso}\nAbra o aplicativo e confira a aba **MINHA LISTA** para assistir agora! 🍿`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: { inline_keyboard: [[{ text: "🚀 ABRIR MELREELS", web_app: { url: process.env.WEBAPP_URL } }]] }
+          }
+        ).catch(() => console.log("⚠️ Cliente bloqueou o bot."));
+      }
+    }
+  } catch (error) {
+    console.error("❌ Erro ao processar Webhook Mercado Pago:", error.message || error);
+  }
+});
+
 // =================================================================
 // 4. LÓGICA DO BOT (COMANDOS E EVENTOS)
 // =================================================================
@@ -2960,8 +3078,8 @@ bot.start(async (ctx) => {
       );
       const data = rows[0];
 
-      if (data && data.valor_config) {
-          fotoStart = data.valor_config; // Puxa a foto que a Mell colocou lá no /admin
+      if (data && data.valor_config && (data.valor_config.startsWith("http://") || data.valor_config.startsWith("https://"))) {
+          fotoStart = data.valor_config; // Puxa a foto que a Mell colocou lá no /admin se for URL válida
       }
   } catch (e) {
       console.log("⚠️ FOTO_START não encontrada no banco, usando padrão.");
@@ -3464,7 +3582,7 @@ bot.action("UPSELL_CONTINUAR_COMPRA", async (ctx) => {
           insertData = { cd_conteudo: id_origem, nr_id_telegram, tp_compra: modalidade };
       }
 
-      const pix = await efiService.gerarPix(valor, titulo, nr_id_telegram, id_origem, modalidade);
+      const pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
 
       const vendaData2 = { ...insertData, tp_status: "PENDENTE", ds_txid: pix.txid };
       const vendaColunas2 = Object.keys(vendaData2);
@@ -3509,7 +3627,7 @@ bot.action(/COMPRAR_PLANO_(.+)/, async (ctx) => {
       let valor = plano.vl_plano;
       let titulo = `Assinatura: ${plano.nm_plano}`;
 
-      const pix = await efiService.gerarPix(valor, titulo, userId, planId, "ASSINATURA");
+      const pix = await gerarPixComFallback(valor, titulo, userId, planId, "ASSINATURA");
 
       await pool.query(
           `INSERT INTO "VENDAS" (cd_plano, nr_id_telegram, tp_compra, tp_status, ds_txid) VALUES ($1, $2, $3, $4, $5)`,
@@ -3791,8 +3909,8 @@ setInterval(async () => {
         for (const venda of pendentes) {
             if (!venda.ds_txid) continue;
 
-            // Pergunta direto para o Banco Efí o status do TXID
-            const infoPix = await efiService.consultarPix(venda.ds_txid);
+            // Pergunta direto para o Gateway (Efí / Mercado Pago) o status do TXID
+            const infoPix = await consultarPixUnificado(venda.ds_txid);
 
             // Se o cliente pagou e fechou o app (Webhook falhou), o varredor conserta!
             if (infoPix && infoPix.status === "CONCLUIDA") {
