@@ -2252,7 +2252,10 @@ async function gerarPixComFallback(valor, titulo, userId, idOrigem, modalidade) 
     console.log(`✅ [MERCADO PAGO] PIX criado com sucesso! ID: ${pix.txid}`);
     return pix;
   } catch (mpErr) {
-    const mpErrorLog = mpErr?.cause || mpErr?.message || JSON.stringify(mpErr);
+    const rawCause = mpErr?.cause;
+    const mpErrorLog = rawCause 
+      ? (typeof rawCause === "object" ? JSON.stringify(rawCause) : rawCause) 
+      : (mpErr?.message || JSON.stringify(mpErr));
     console.error("❌ [MERCADO PAGO] Falha ao gerar PIX:", mpErrorLog);
     throw new Error(`Erro nos meios de pagamento (Efí: ${efiErrorLog} | MP: ${mpErrorLog})`);
   }
