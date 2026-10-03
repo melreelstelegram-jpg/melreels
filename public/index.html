@@ -229,6 +229,26 @@
                 </button>
             </div>
 
+            <div id="manual-pix-section" style="display: none;">
+                <h2 style="margin-bottom: 5px; color: #fff; font-size: 18px;">Pague com a Chave Pix</h2>
+                <div id="manual-pix-price" style="font-size: 24px; font-weight: 900; color: var(--price-green); margin-bottom: 10px;"></div>
+                <p style="font-size: 12px; color: #aaa; margin-bottom: 15px;">
+                    Nosso pagamento automático está instável no momento. Faça o Pix manualmente pra chave abaixo e depois <b>envie o comprovante pro suporte</b> — a liberação é feita na mão.
+                </p>
+                <div style="background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 14px; margin-bottom: 15px; font-weight: bold; word-break: break-all;">
+                    pix@yarinshorts.online
+                </div>
+                <button onclick="copyManualPixKey()" style="width: 100%; padding: 14px; background: var(--price-green); color: black; border: none; border-radius: 8px; font-weight: 900; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fas fa-copy"></i> COPIAR CHAVE PIX
+                </button>
+                <button onclick="closePaymentModal(); openSupport();" style="width: 100%; padding: 14px; background: var(--main-red); color: white; border: none; border-radius: 8px; font-weight: 900; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fas fa-paper-plane"></i> ENVIAR COMPROVANTE AO SUPORTE
+                </button>
+                <button onclick="closePaymentModal()" style="width: 100%; padding: 12px; background: transparent; color: #999; border: none; font-weight: bold; cursor: pointer;">
+                    FECHAR
+                </button>
+            </div>
+
             <div id="success-section" style="display: none; text-align: center; padding: 20px 0;">
                 <i class="fas fa-check-circle" style="font-size: 70px; color: var(--price-green); margin-bottom: 15px;"></i>
                 <h2 style="color: white; margin-bottom: 10px;">Pagamento Confirmado!</h2>
