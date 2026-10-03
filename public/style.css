@@ -1217,3 +1217,32 @@ body.vip-mode .nav-item.active span {
     -webkit-backdrop-filter: blur(8px) !important;
   }
 }
+
+
+/* =================================================================
+   CORREÇÃO DE OVERLAP DO CABEÇALHO DO TELEGRAM (SAFE AREA TOP FIX)
+   ================================================================= */
+header {
+  padding-top: max(54px, calc(50px + env(safe-area-inset-top, 0px))) !important;
+  padding-left: 15px !important;
+  padding-right: 15px !important;
+  padding-bottom: 10px !important;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.85) 75%, rgba(0,0,0,0) 100%) !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2000 !important;
+}
+
+.details-header {
+  position: absolute !important;
+  top: 0 !important;
+  width: 100% !important;
+  display: flex !important;
+  justify-content: space-between !important;
+  padding-top: max(54px, calc(50px + env(safe-area-inset-top, 0px))) !important;
+  padding-left: 15px !important;
+  padding-right: 15px !important;
+  padding-bottom: 15px !important;
+  z-index: 9999 !important;
+  pointer-events: none !important;
+}
