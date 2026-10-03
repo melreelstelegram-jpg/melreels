@@ -1,4 +1,40 @@
 
+// Bloqueia o gesto nativo do Telegram iOS de fechar o app ao deslizar para baixo
+function enableIOSCloseProtection() {
+    try {
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            if (typeof tg.disableVerticalSwipes === 'function') {
+                tg.disableVerticalSwipes();
+            }
+        }
+    } catch(e) {}
+}
+
+let touchStartY = 0;
+document.addEventListener('touchstart', (e) => {
+    if (e.touches && e.touches.length > 0) {
+        touchStartY = e.touches[0].clientY;
+    }
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+    if (e.touches && e.touches.length > 0) {
+        const touchY = e.touches[0].clientY;
+        const touchDiff = touchY - touchStartY;
+        // Se estiver no topo absoluto da página e puxando para baixo
+        if ((window.scrollY || document.documentElement.scrollTop || 0) <= 0 && touchDiff > 0) {
+            // Previne o puxão que fecha o aplicativo no Telegram iOS
+            if (e.cancelable) {
+                e.preventDefault();
+            }
+        }
+    }
+}, { passive: false });
+
+enableIOSCloseProtection();
+
+
 function updateTelegramSafeArea() {
     try {
         if (window.Telegram && window.Telegram.WebApp) {
@@ -20,6 +56,7 @@ let isHomeRendered = false;
 const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
+try { if (tg.disableVerticalSwipes) tg.disableVerticalSwipes(); } catch(e){}
 
 // Configura cor de fundo do Telegram para bater com o App
 tg.setHeaderColor("#000000");
