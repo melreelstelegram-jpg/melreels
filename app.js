@@ -2226,27 +2226,6 @@ app.get("/api/plans", async (req, res) => {
   }
 });
 
-// Chave Pix manual — último recurso quando EFÍ e Mercado Pago falham os
-// dois. Cliente paga direto nessa chave e manda o comprovante pro suporte,
-// que libera manualmente (Gerenciar Cliente no /admin).
-const PIX_MANUAL_CHAVE = "pix@yarinshorts.online";
-
-/** Registra a venda como PENDENTE sem txid (ninguém confirma sozinho —
- * depende do admin liberar na mão depois de ver o comprovante). */
-async function criarVendaManual(insertData) {
-  const vendaData = { ...insertData, tp_status: "PENDENTE" };
-  const colunas = Object.keys(vendaData);
-  const placeholders = colunas.map((_, i) => `$${i + 1}`).join(", ");
-  try {
-    await pool.query(
-      `INSERT INTO "VENDAS" (${colunas.join(", ")}) VALUES (${placeholders})`,
-      colunas.map(col => vendaData[col])
-    );
-  } catch (dbError) {
-    console.error("❌ [ERRO DB] Falha ao salvar venda manual (Pix na mão):", dbError.message);
-  }
-}
-
 // =================================================================
 // HELPER DE PAGAMENTO UNIFICADO (Efí Bank -> Mercado Pago -> InfinitePay)
 // =================================================================
@@ -2368,22 +2347,8 @@ app.post("/api/create-order", async (req, res) => {
       insertData = { cd_conteudo: id_origem, nr_id_telegram, tp_compra: modalidade };
     }
 
-    // 🎯 1. GERAR PIX COM FALLBACK (EFÍ -> MERCADO PAGO)
-    let pix;
-    try {
-      pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
-    } catch (pixError) {
-      // Os dois provedores falharam — cai pro Pix manual em vez de travar a compra.
-      console.error("❌ [CREATE-ORDER] EFÍ e Mercado Pago falharam, caindo pro Pix manual:", pixError?.message || pixError);
-      await criarVendaManual(insertData);
-      return res.json({
-        success: true,
-        manual: true,
-        pixKey: PIX_MANUAL_CHAVE,
-        valor,
-        titulo,
-      });
-    }
+    // 🎯 1. GERAR PIX COM FALLBACK (EFÍ -> MERCADO PAGO -> INFINITEPAY)
+    const pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
 
     // 🎯 2. SALVA O TXID NA VENDA (Protegido com logs claros)
     const vendaData = { ...insertData, tp_status: "PENDENTE", ds_txid: pix.txid };
@@ -3710,18 +3675,7 @@ bot.action("UPSELL_CONTINUAR_COMPRA", async (ctx) => {
           insertData = { cd_conteudo: id_origem, nr_id_telegram, tp_compra: modalidade };
       }
 
-      let pix;
-      try {
-        pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
-      } catch (pixError) {
-        console.error("❌ [UPSELL] EFÍ e Mercado Pago falharam, caindo pro Pix manual:", pixError?.message || pixError);
-        await criarVendaManual(insertData);
-        await ctx.reply(
-          `⚠️ Nosso pagamento automático está instável no momento.\n\n🍿 **Item: ${titulo}**\n💰 Valor: R$ ${valor.toFixed(2).replace('.', ',')}\n\nFaça o Pix manualmente pra chave:\n\`${PIX_MANUAL_CHAVE}\`\n\nDepois envie o **comprovante pro suporte** que liberamos seu acesso na mão.`,
-          { parse_mode: "Markdown" }
-        );
-        return;
-      }
+      const pix = await gerarPixComFallback(valor, titulo, nr_id_telegram, id_origem, modalidade);
 
       const vendaData2 = { ...insertData, tp_status: "PENDENTE", ds_txid: pix.txid };
       const vendaColunas2 = Object.keys(vendaData2);
@@ -3766,18 +3720,7 @@ bot.action(/COMPRAR_PLANO_(.+)/, async (ctx) => {
       let valor = plano.vl_plano;
       let titulo = `Assinatura: ${plano.nm_plano}`;
 
-      let pix;
-      try {
-        pix = await gerarPixComFallback(valor, titulo, userId, planId, "ASSINATURA");
-      } catch (pixError) {
-        console.error("❌ [COMPRAR_PLANO] EFÍ e Mercado Pago falharam, caindo pro Pix manual:", pixError?.message || pixError);
-        await criarVendaManual({ cd_plano: planId, nr_id_telegram: userId, tp_compra: "ASSINATURA" });
-        await ctx.reply(
-          `⚠️ Nosso pagamento automático está instável no momento.\n\n👑 **Plano: ${plano.nm_plano}**\n💰 Valor: R$ ${valor.toFixed(2).replace('.', ',')}\n\nFaça o Pix manualmente pra chave:\n\`${PIX_MANUAL_CHAVE}\`\n\nDepois envie o **comprovante pro suporte** que liberamos seu acesso na mão.`,
-          { parse_mode: "Markdown" }
-        );
-        return;
-      }
+      const pix = await gerarPixComFallback(valor, titulo, userId, planId, "ASSINATURA");
 
       await pool.query(
           `INSERT INTO "VENDAS" (cd_plano, nr_id_telegram, tp_compra, tp_status, ds_txid) VALUES ($1, $2, $3, $4, $5)`,
