@@ -7,6 +7,7 @@ import FormData from "form-data";
 import { Composer, Markup, Scenes, Telegraf } from "telegraf";
 import efiService from "./src/services/efiService.js";
 import mpService from "./src/services/mercadopago.js";
+import infinitepayService from "./src/services/infinitepay.js";
 import pool from "./src/services/db.js";
 
 const app = express();
@@ -2247,11 +2248,12 @@ async function criarVendaManual(insertData) {
 }
 
 // =================================================================
-// HELPER DE PAGAMENTO UNIFICADO (Efí Bank com Fallback para Mercado Pago)
+// HELPER DE PAGAMENTO UNIFICADO (Efí Bank -> Mercado Pago -> InfinitePay)
 // =================================================================
 async function gerarPixComFallback(valor, titulo, userId, idOrigem, modalidade) {
   let pix = null;
   let efiErrorLog = null;
+  let mpErrorLog = null;
 
   // 1. Tenta Efí Bank
   try {
@@ -2274,16 +2276,36 @@ async function gerarPixComFallback(valor, titulo, userId, idOrigem, modalidade) 
     return pix;
   } catch (mpErr) {
     const rawCause = mpErr?.cause;
-    const mpErrorLog = rawCause 
-      ? (typeof rawCause === "object" ? JSON.stringify(rawCause) : rawCause) 
+    mpErrorLog = rawCause
+      ? (typeof rawCause === "object" ? JSON.stringify(rawCause) : rawCause)
       : (mpErr?.message || JSON.stringify(mpErr));
-    console.error("❌ [MERCADO PAGO] Falha ao gerar PIX:", mpErrorLog);
-    throw new Error(`Erro nos meios de pagamento (Efí: ${efiErrorLog} | MP: ${mpErrorLog})`);
+    console.error(`❌ [MERCADO PAGO] Falha ao gerar PIX (${mpErrorLog}). Acionando fallback da InfinitePay...`);
+  }
+
+  // 3. Fallback InfinitePay (link de checkout, não é QR/copia-e-cola direto)
+  try {
+    console.log("⏳ [INFINITEPAY] Solicitando link de checkout via fallback...");
+    pix = await infinitepayService.gerarLink(valor, titulo, userId, idOrigem, modalidade);
+    console.log(`✅ [INFINITEPAY] Link de checkout criado com sucesso! NSU: ${pix.txid}`);
+    return pix;
+  } catch (ipErr) {
+    const ipErrorLog = ipErr?.message || JSON.stringify(ipErr);
+    console.error("❌ [INFINITEPAY] Falha ao gerar link:", ipErrorLog);
+    throw new Error(`Erro nos meios de pagamento (Efí: ${efiErrorLog} | MP: ${mpErrorLog} | InfinitePay: ${ipErrorLog})`);
   }
 }
 
 async function consultarPixUnificado(txid) {
   if (!txid) return null;
+
+  // Prefixo "IP-" identifica um order_nsu da InfinitePay
+  if (String(txid).startsWith("IP-")) {
+    const ipInfo = await infinitepayService.consultarPagamento(txid);
+    if (ipInfo?.paid) {
+      return { status: "CONCLUIDA", provider: "INFINITEPAY", raw: ipInfo };
+    }
+    return { status: ipInfo?.success ? "PENDENTE" : null, provider: "INFINITEPAY", raw: ipInfo };
+  }
 
   // Se o TXID é numérico (ex: "181175315263"), é do Mercado Pago
   if (/^\d+$/.test(String(txid))) {
@@ -2379,17 +2401,25 @@ app.post("/api/create-order", async (req, res) => {
         throw new Error("Erro ao salvar a venda no banco de dados.");
     }
 
-    // 🎯 3. LIMPEZA DE STRING SEGURA (Evita crash de undefined/split)
+    // 🎯 3. DEVOLVE PRA TELA DO CLIENTE
+    if (pix.link) {
+      // InfinitePay: não tem QR/copia-e-cola, é um link hospedado pro cliente pagar.
+      return res.json({
+        success: true,
+        link: pix.link,
+      });
+    }
+
+    // Limpeza de string segura (Evita crash de undefined/split)
     let base64Code = pix.qrCode || "";
     if (base64Code.includes(",")) {
         base64Code = base64Code.split(",")[1];
     }
 
-    // 🎯 4. DEVOLVE PRA TELA DO CLIENTE
     res.json({
       success: true,
       qrCodeBase64: base64Code,
-      qrCode: pix.copyPaste 
+      qrCode: pix.copyPaste
     });
 
   } catch (error) {
@@ -3061,6 +3091,66 @@ app.post(["/webhook-mp", "/webhook/mercadopago"], async (req, res) => {
     }
   } catch (error) {
     console.error("❌ Erro ao processar Webhook Mercado Pago:", error.message || error);
+  }
+});
+
+// Webhook InfinitePay — payload chega só quando o pagamento é confirmado,
+// mas não existe assinatura documentada pra validar a origem da chamada,
+// então reconfirma direto na API (/payment_check) antes de aprovar, em vez
+// de confiar cegamente no corpo recebido.
+app.post("/webhook-infinitepay", async (req, res) => {
+  console.log("🔔 [WEBHOOK INFINITEPAY] Notificação recebida:", JSON.stringify(req.body));
+  res.sendStatus(200);
+
+  try {
+    const orderNsu = req.body?.order_nsu;
+    if (!orderNsu) return;
+
+    const info = await infinitepayService.consultarPagamento(orderNsu);
+    if (!info?.paid) return;
+
+    const { rows: vendaRows } = await pool.query(
+      `SELECT v.*, p.nr_dias_validade AS "planoDiasValidade"
+       FROM "VENDAS" v
+       LEFT JOIN "PLANOS" p ON p.cd_plano = v.cd_plano
+       WHERE v.ds_txid = $1 AND v.tp_status = $2
+       LIMIT 1`,
+      [orderNsu, "PENDENTE"]
+    );
+    const venda = vendaRows[0];
+    if (!venda) return;
+
+    const type = venda.tp_compra;
+    let diasValidade = type === "ALUGUEL" ? 7 : type === "VITALICIO" ? 18250 : 30;
+    if (type === "ASSINATURA" && venda.planoDiasValidade) {
+      diasValidade = venda.planoDiasValidade;
+    }
+
+    const ts_expiracao = new Date();
+    ts_expiracao.setDate(ts_expiracao.getDate() + diasValidade);
+
+    await pool.query(
+      'UPDATE "VENDAS" SET tp_status = $1, ts_expiracao = $2 WHERE ds_txid = $3',
+      ["APROVADA", ts_expiracao.toISOString(), orderNsu]
+    );
+
+    catalogCache.data = null;
+    console.log(`✅ [INFINITEPAY] Venda APROVADA via Webhook! NSU: ${orderNsu}`);
+
+    const textoAcesso = (venda.tp_compra === "ASSINATURA")
+      ? "Seu **Acesso Premium** foi liberado! 👑"
+      : "Seu **Filme** foi liberado com sucesso! 🎬";
+
+    await bot.telegram.sendMessage(
+      venda.nr_id_telegram,
+      `🎉 **PAGAMENTO CONFIRMADO!**\n\n${textoAcesso}\nAbra o aplicativo e confira a aba **MINHA LISTA** para assistir agora! 🍿`,
+      {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: [[{ text: "🚀 ABRIR MELREELS", web_app: { url: process.env.WEBAPP_URL } }]] }
+      }
+    ).catch(() => console.log("⚠️ Cliente bloqueou o bot."));
+  } catch (error) {
+    console.error("❌ Erro ao processar Webhook InfinitePay:", error.message || error);
   }
 });
 

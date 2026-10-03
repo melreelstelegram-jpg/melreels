@@ -896,59 +896,18 @@ function fecharModalCompra() {
   document.getElementById("custom-buy-modal").style.display = "none";
 }
 
-async function processarCompra(id, titulo, modalidade, valorFinal) {
-  if (userId === 0)
-    return tg.showAlert("⚠️ Por favor, acesse o app através do Bot oficial para realizar compras.");
+// Fica checando /api/check-payment até aprovar — usado tanto pelo fluxo de
+// QR Code inline (EFÍ/MP) quanto pelo link de checkout externo (InfinitePay).
+function iniciarPollingPagamento(modalidade, id) {
+  clearInterval(paymentPollingInterval);
+  paymentPollingInterval = setInterval(async () => {
+      try {
+          const isPlan = modalidade === "ASSINATURA";
+          const param = isPlan ? `planId=${id}` : `contentId=${id}`;
+          const resPoll = await fetch(`/api/check-payment?userId=${userId}&${param}`);
+          const dataPoll = await resPoll.json();
 
-  tg.MainButton.setText(`PAGAR R$ ${parseFloat(valorFinal).toFixed(2)}`);
-  tg.MainButton.show();
-  tg.MainButton.showProgress();
-
-  try {
-    const res = await fetch("/api/create-order", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id_origem: id, nr_id_telegram: userId, modalidade }),
-    });
-    const result = await res.json();
-
-    if (result.success && result.manual) {
-      // Fallback: EFÍ e Mercado Pago falharam os dois — mostra a chave Pix manual.
-      document.getElementById("qr-code-section").style.display = "none";
-      document.getElementById("success-section").style.display = "none";
-      document.getElementById("manual-pix-section").style.display = "block";
-      document.getElementById("manual-pix-price").innerText = `R$ ${parseFloat(valorFinal).toFixed(2).replace('.', ',')}`;
-      document.getElementById("payment-modal").style.display = "flex";
-
-      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("warning");
-    } else if (result.success) {
-      currentPixCode = result.qrCode;
-
-      // Reseta as telas do modal
-      document.getElementById("qr-code-section").style.display = "block";
-      document.getElementById("manual-pix-section").style.display = "none";
-      document.getElementById("success-section").style.display = "none";
-
-      const promoBadge = document.getElementById("payment-promo-badge");
-      if (promoBadge) promoBadge.style.display = "none";
-
-      document.getElementById("modal-price").innerText = `R$ ${parseFloat(valorFinal).toFixed(2).replace('.', ',')}`;
-      document.getElementById("modal-title").innerText = titulo;
-      document.getElementById("qr-code-img").src = `data:image/jpeg;base64,${result.qrCodeBase64}`;
-      document.getElementById("payment-modal").style.display = "flex";
-      
-      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
-
-      // --- INÍCIO DO POLLING DE VERIFICAÇÃO ---
-      clearInterval(paymentPollingInterval);
-      paymentPollingInterval = setInterval(async () => {
-          try {
-              const isPlan = modalidade === "ASSINATURA";
-              const param = isPlan ? `planId=${id}` : `contentId=${id}`;
-              const resPoll = await fetch(`/api/check-payment?userId=${userId}&${param}`);
-              const dataPoll = await resPoll.json();
-
-              if (dataPoll.approved) {
+          if (dataPoll.approved) {
     clearInterval(paymentPollingInterval);
 
     // 🚀 Atualiza o status VIP e a lista do cliente AGORA, sem precisar fechar o app.
@@ -959,6 +918,7 @@ async function processarCompra(id, titulo, modalidade, valorFinal) {
 
     // Atualiza as telas do modal
     document.getElementById("qr-code-section").style.display = "none";
+    document.getElementById("link-pix-section").style.display = "none";
     document.getElementById("success-section").style.display = "block";
 
     // 🚀 AQUI ENTRA A MUDANÇA DO SINO DE NOTIFICAÇÃO:
@@ -967,7 +927,7 @@ async function processarCompra(id, titulo, modalidade, valorFinal) {
     if (!document.getElementById("badge-novo")) {
         navMyList.innerHTML += `<div id="badge-novo" class="nav-badge">1</div>`;
     }
-    
+
     // 🎯 AQUI ESTÁ A MUDANÇA:
     // Se for um filme (não plano), o botão de sucesso abre o filme direto
     const btnSucesso = document.querySelector("#success-section button");
@@ -985,9 +945,69 @@ async function processarCompra(id, titulo, modalidade, valorFinal) {
 
     if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
 }
-          } catch(e) {}
-      }, 3000);
-      // --- FIM DO POLLING ---
+      } catch(e) {}
+  }, 3000);
+}
+
+async function processarCompra(id, titulo, modalidade, valorFinal) {
+  if (userId === 0)
+    return tg.showAlert("⚠️ Por favor, acesse o app através do Bot oficial para realizar compras.");
+
+  tg.MainButton.setText(`PAGAR R$ ${parseFloat(valorFinal).toFixed(2)}`);
+  tg.MainButton.show();
+  tg.MainButton.showProgress();
+
+  try {
+    const res = await fetch("/api/create-order", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id_origem: id, nr_id_telegram: userId, modalidade }),
+    });
+    const result = await res.json();
+
+    if (result.success && result.manual) {
+      // Fallback: EFÍ, Mercado Pago e InfinitePay falharam todos — mostra a chave Pix manual.
+      document.getElementById("qr-code-section").style.display = "none";
+      document.getElementById("link-pix-section").style.display = "none";
+      document.getElementById("success-section").style.display = "none";
+      document.getElementById("manual-pix-section").style.display = "block";
+      document.getElementById("manual-pix-price").innerText = `R$ ${parseFloat(valorFinal).toFixed(2).replace('.', ',')}`;
+      document.getElementById("payment-modal").style.display = "flex";
+
+      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("warning");
+    } else if (result.success && result.link) {
+      // Fallback: InfinitePay — não tem QR inline, abre um link de checkout externo.
+      document.getElementById("qr-code-section").style.display = "none";
+      document.getElementById("manual-pix-section").style.display = "none";
+      document.getElementById("success-section").style.display = "none";
+      document.getElementById("link-pix-section").style.display = "block";
+      document.getElementById("link-pix-price").innerText = `R$ ${parseFloat(valorFinal).toFixed(2).replace('.', ',')}`;
+      document.getElementById("link-pix-title").innerText = titulo;
+      document.getElementById("payment-modal").style.display = "flex";
+
+      document.getElementById("btn-abrir-link-pagamento").onclick = () => tg.openLink(result.link);
+
+      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+      iniciarPollingPagamento(modalidade, id);
+    } else if (result.success) {
+      currentPixCode = result.qrCode;
+
+      // Reseta as telas do modal
+      document.getElementById("qr-code-section").style.display = "block";
+      document.getElementById("link-pix-section").style.display = "none";
+      document.getElementById("manual-pix-section").style.display = "none";
+      document.getElementById("success-section").style.display = "none";
+
+      const promoBadge = document.getElementById("payment-promo-badge");
+      if (promoBadge) promoBadge.style.display = "none";
+
+      document.getElementById("modal-price").innerText = `R$ ${parseFloat(valorFinal).toFixed(2).replace('.', ',')}`;
+      document.getElementById("modal-title").innerText = titulo;
+      document.getElementById("qr-code-img").src = `data:image/jpeg;base64,${result.qrCodeBase64}`;
+      document.getElementById("payment-modal").style.display = "flex";
+
+      if (tg.HapticFeedback) tg.HapticFeedback.notificationOccurred("success");
+      iniciarPollingPagamento(modalidade, id);
 
     } else {
       if (result.interceptedUpsell) {

@@ -229,6 +229,20 @@
                 </button>
             </div>
 
+            <div id="link-pix-section" style="display: none; text-align: center;">
+                <h2 id="link-pix-title" style="margin-bottom: 5px; color: #fff; font-size: 18px;">Finalizar Pagamento</h2>
+                <div id="link-pix-price" style="font-size: 24px; font-weight: 900; color: var(--price-green); margin-bottom: 15px;"></div>
+                <p style="font-size: 12px; color: #aaa; margin-bottom: 15px;">
+                    Clique no botão abaixo pra abrir a página de pagamento (Pix ou cartão). Depois de pagar, volte pra cá que liberamos automaticamente.
+                </p>
+                <button id="btn-abrir-link-pagamento" style="width: 100%; padding: 14px; background: var(--price-green); color: black; border: none; border-radius: 8px; font-weight: 900; margin-bottom: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="fas fa-external-link-alt"></i> ABRIR PÁGINA DE PAGAMENTO
+                </button>
+                <button onclick="closePaymentModal()" style="width: 100%; padding: 12px; background: transparent; color: #999; border: none; font-weight: bold; cursor: pointer;">
+                    CANCELAR
+                </button>
+            </div>
+
             <div id="manual-pix-section" style="display: none;">
                 <h2 style="margin-bottom: 5px; color: #fff; font-size: 18px;">Pague com a Chave Pix</h2>
                 <div id="manual-pix-price" style="font-size: 24px; font-weight: 900; color: var(--price-green); margin-bottom: 10px;"></div>
