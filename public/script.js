@@ -1,3 +1,17 @@
+
+function updateTelegramSafeArea() {
+    try {
+        if (window.Telegram && window.Telegram.WebApp) {
+            const tg = window.Telegram.WebApp;
+            const topInset = tg.contentSafeAreaInset?.top || tg.safeAreaInset?.top || 0;
+            if (topInset > 0) {
+                document.documentElement.style.setProperty('--tg-safe-top', topInset + 'px');
+            }
+        }
+    } catch(e) {}
+}
+updateTelegramSafeArea();
+
 let isHomeRendered = false;
 /* =================================================================
    MELREELS - SCRIPT OFICIAL DO MINI APP (Aprimorado)

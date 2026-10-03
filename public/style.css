@@ -1220,10 +1220,10 @@ body.vip-mode .nav-item.active span {
 
 
 /* =================================================================
-   CORREÇÃO DE OVERLAP DO CABEÇALHO DO TELEGRAM (SAFE AREA TOP FIX)
+   CORREÇÃO DE OVERLAP DO CABEÇALHO DO TELEGRAM (SAFE AREA TOP FIX RESPONSIVO)
    ================================================================= */
 header {
-  padding-top: max(54px, calc(50px + env(safe-area-inset-top, 0px))) !important;
+  padding-top: max(72px, calc(64px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
   padding-left: 15px !important;
   padding-right: 15px !important;
   padding-bottom: 10px !important;
@@ -1239,10 +1239,14 @@ header {
   width: 100% !important;
   display: flex !important;
   justify-content: space-between !important;
-  padding-top: max(54px, calc(50px + env(safe-area-inset-top, 0px))) !important;
+  padding-top: max(72px, calc(64px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
   padding-left: 15px !important;
   padding-right: 15px !important;
   padding-bottom: 15px !important;
   z-index: 9999 !important;
   pointer-events: none !important;
+}
+
+.drama-request-header {
+  padding-top: max(72px, calc(64px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
 }
