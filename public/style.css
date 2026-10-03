@@ -1176,3 +1176,44 @@ body.vip-mode .nav-item.active span {
   from { text-shadow: 0 0 2px rgba(255, 215, 0, 0.5); }
   to { text-shadow: 0 0 10px rgba(255, 215, 0, 0.9); }
 }
+/* =================================================================
+   MELREELS PERFORMANCE & FLUIDITY ENHANCEMENTS (60 FPS)
+   ================================================================= */
+
+/* Placa de Vídeo / GPU Hardware Acceleration para rolagem e transições suaves */
+.horizontal-scroll, .top12-grid, .hero-slider, .grid {
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: smooth;
+  will-change: scroll-position;
+}
+
+.container {
+  transition: opacity 0.2s cubic-bezier(0.25, 1, 0.5, 1), transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+  will-change: opacity, transform;
+}
+
+/* Prevenção de Pulos de Layout (CLS) com Proporção de Aspecto (Aspect-Ratio) */
+.card img, .card-mini img, .card-top12 img, .details-mini-poster, .suggestion-cover img {
+  aspect-ratio: 2 / 3;
+  background-color: #1a1a1a;
+  object-fit: cover;
+  transition: opacity 0.25s ease;
+}
+
+/* Efeito suave de abertura para modais (Sensação de App Nativo) */
+#movie-details, .payment-modal, #support-menu-modal {
+  animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@keyframes slideUpModal {
+  from { opacity: 0; transform: translateY(25px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Redução de peso no Blur do CSS para garantir 60fps em aparelhos mais simples */
+@supports (-webkit-backdrop-filter: none) or (backdrop-filter: none) {
+  .search-container, .quick-action-chip {
+    backdrop-filter: blur(8px) !important;
+    -webkit-backdrop-filter: blur(8px) !important;
+  }
+}

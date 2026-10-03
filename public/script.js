@@ -1,3 +1,4 @@
+let isHomeRendered = false;
 /* =================================================================
    MELREELS - SCRIPT OFICIAL DO MINI APP (Aprimorado)
    ================================================================= */
@@ -54,38 +55,47 @@ function updateUserId() {
 async function init() {
   updateUserId();
   try {
-    await fetchUserStatus();
+    const reqUserStatus = fetchUserStatus().catch(e => console.error(e));
+    const reqCatalog = fetch("/api/catalog").then(r => r.json()).catch(e => { console.error(e); return []; });
+    const reqMyContents = (userId !== 0) 
+      ? fetch(`/api/my-contents?userId=${userId}`).then(r => r.json()).catch(e => [])
+      : Promise.resolve([]);
+    const reqHistorico = (userId !== 0)
+      ? fetch(`/api/historico?userId=${userId}&_t=${Date.now()}`).then(r => r.json()).catch(e => [])
+      : Promise.resolve([]);
 
-    // 🚀 PUXA A LISTA DO QUE O CLIENTE JÁ TEM ANTES DE PINTAR A TELA
-    if (userId !== 0) {
-        try {
-            const resMy = await fetch(`/api/my-contents?userId=${userId}`);
-            const dataMy = await resMy.json();
-            userPurchasedIds = dataMy.map(i => i.cd_conteudo);
-            
-            const resHist = await fetch(`/api/historico?userId=${userId}&_t=${Date.now()}`);
-            userHistory = await resHist.json();
-        } catch(e) {}
+    const [_, catalogData, myContentsData, historicoData] = await Promise.all([
+      reqUserStatus,
+      reqCatalog,
+      reqMyContents,
+      reqHistorico
+    ]);
+
+    if (Array.isArray(myContentsData)) {
+      userPurchasedIds = myContentsData.map(i => i.cd_conteudo);
     }
-	
-	
+    if (Array.isArray(historicoData)) {
+      userHistory = historicoData;
+    }
 
-    const res = await fetch("/api/catalog");
-    fullCatalog = await res.json();
+    fullCatalog = catalogData || [];
     renderHome();
+    isHomeRendered = true;
 
-    // 🎯 O PULO DO GATO: Checa se tem um filme específico na URL (Deep Link)
     const urlParams = new URLSearchParams(window.location.search);
     const movieId = urlParams.get("movie");
     
     if (movieId) {
         setTimeout(() => {
             openMovieDetails(movieId);
-        }, 300);
+        }, 150);
     }
 
-    document.getElementById("app-loader").style.opacity = "0";
-    setTimeout(() => (document.getElementById("app-loader").style.display = "none"), 300);
+    const loader = document.getElementById("app-loader");
+    if (loader) {
+      loader.style.opacity = "0";
+      setTimeout(() => (loader.style.display = "none"), 250);
+    }
 	
 	setInterval(() => sendHeartbeat(), 30000);
     sendHeartbeat();
@@ -1253,29 +1263,34 @@ function switchTab(tabId) {
   containers.forEach((c) => {
     c.classList.remove("active");
     c.classList.remove("fade-in");
-    // 🎯 O PULO DO GATO: Isso limpa o "display: none" invisível que causava a tela preta
-    c.style.display = ""; 
+    c.style.display = "none";
   });
 
   const navItems = document.querySelectorAll(".nav-item");
   navItems.forEach((n) => n.classList.remove("active"));
 
   const targetContainer = document.getElementById(tabId);
-  targetContainer.classList.add("active");
-  void targetContainer.offsetWidth;
-  targetContainer.classList.add("fade-in");
+  if (targetContainer) {
+    targetContainer.style.display = "block";
+    targetContainer.classList.add("active");
+    void targetContainer.offsetWidth;
+    targetContainer.classList.add("fade-in");
+  }
 
-  document.getElementById("nav-" + tabId).classList.add("active");
+  const navEl = document.getElementById("nav-" + tabId);
+  if (navEl) navEl.classList.add("active");
 
   if (tabId === "home") {
-    document.getElementById("search-input").value = "";
-    renderHome();
+    const searchInput = document.getElementById("search-input");
+    if (searchInput) searchInput.value = "";
+    if (!isHomeRendered) {
+      renderHome();
+      isHomeRendered = true;
+    }
   }
   if (tabId === "mylist") {
-      // Estoura a bolha de notificação se ela existir
       const badge = document.getElementById("badge-novo");
       if (badge) badge.remove(); 
-      
       loadMyList();
   }
   if (tabId === "bestsellers") loadPlans();
