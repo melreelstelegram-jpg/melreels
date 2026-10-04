@@ -1923,9 +1923,6 @@ async function obterCarenciaHoras() {
 // isso é filtrado só pelo banimento TOTAL no middleware global.
 // =================================================================
 async function mensagemBloqueioCompra(nrIdTelegram, acao) {
-  // Bloqueio temporário (Eleições)
-  return "⚠️ Pagamentos pausados temporariamente devido às eleições. Voltaremos em breve!";
-
   try {
     const { rows } = await pool.query('SELECT * FROM "BANS" WHERE nr_id_telegram = $1 LIMIT 1', [nrIdTelegram]);
     const ban = rows[0];
