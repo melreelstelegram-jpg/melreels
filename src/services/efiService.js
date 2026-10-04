@@ -68,7 +68,7 @@ const efiService = {
       const cobranca = await efi.pixDetailCharge(params);
       return cobranca; // Retorna um objeto com status "ATIVA" ou "CONCLUIDA"
     } catch (error) {
-      console.error(`❌ Erro ao consultar TXID ${txid} na Efí:`, error.message);
+      console.error(`❌ Erro ao consultar TXID ${txid} na Efí:`, error?.mensagem || error?.message || error);
       return null;
     }
   }

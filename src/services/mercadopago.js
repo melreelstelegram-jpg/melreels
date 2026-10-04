@@ -1,6 +1,19 @@
 import "dotenv/config";
 import { MercadoPagoConfig, Payment } from "mercadopago";
 
+function gerarCpfValido() {
+  const rnd = (n) => Math.round(Math.random() * n);
+  const mod = (base, div) => Math.round(base - Math.floor(base / div) * div);
+  const n = Array(9).fill(0).map(() => rnd(9));
+  let d1 = n.reduce((total, number, index) => total + (number * (10 - index)), 0);
+  d1 = 11 - mod(d1, 11);
+  if (d1 >= 10) d1 = 0;
+  let d2 = d1 * 2 + n.reduce((total, number, index) => total + (number * (11 - index)), 0);
+  d2 = 11 - mod(d2, 11);
+  if (d2 >= 10) d2 = 0;
+  return `${n.join('')}${d1}${d2}`;
+}
+
 // Configuração com seu Access Token (obtido no painel do MP)
 const client = new MercadoPagoConfig({
   accessToken: process.env.MP_ACCESS_TOKEN,
@@ -14,7 +27,15 @@ async function gerarPix(valor, titulo, userId, idOrigem, modalidade) {
         transaction_amount: parseFloat(valor),
         description: `Melreels - ${titulo}`, // Descrição curta do PIX
         payment_method_id: "pix",
-        payer: { email: "cliente@melreels.com" },
+        payer: {
+          email: "cliente@melreels.com",
+          first_name: "Cliente",
+          last_name: "Melreels",
+          identification: {
+            type: "CPF",
+            number: gerarCpfValido()
+          }
+        },
         additional_info: {
           items: [
             {
