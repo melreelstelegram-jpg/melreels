@@ -2228,7 +2228,7 @@ app.get("/api/plans", async (req, res) => {
 // Chave Pix manual — último recurso quando EFÍ e Mercado Pago falham os
 // dois. Cliente paga direto nessa chave e manda o comprovante pro suporte,
 // que libera manualmente (Gerenciar Cliente no /admin).
-const PIX_MANUAL_CHAVE = "pix@yarinshorts.online";
+const PIX_MANUAL_CHAVE = "508920b1-926f-4845-b4eb-a22c6e5e00cf";
 
 /** Registra a venda como PENDENTE sem txid (ninguém confirma sozinho —
  * depende do admin liberar na mão depois de ver o comprovante). */

@@ -1377,7 +1377,7 @@ function closePaymentModal() {
 
 function copyManualPixKey() {
   const el = document.createElement("textarea");
-  el.value = "pix@yarinshorts.online";
+  el.value = "508920b1-926f-4845-b4eb-a22c6e5e00cf";
   document.body.appendChild(el);
   el.select();
   document.execCommand("copy");
