@@ -2165,7 +2165,8 @@ app.get("/api/my-contents", async (req, res) => {
 
     // 1. Busca Vendas
     const { rows: vendas } = await pool.query(
-      `SELECT v.cd_conteudo, v.cd_plano, v.tp_status, v.ts_expiracao, p.nm_categoria AS "planoCategoria"
+      `SELECT v.cd_conteudo, v.cd_plano, v.tp_status, v.ts_expiracao,
+              (p.nm_categoria || ',' || COALESCE(array_to_string(p.nm_categorias_adicionais, ','), '')) AS "planoCategoria"
        FROM "VENDAS" v
        LEFT JOIN "PLANOS" p ON p.cd_plano = v.cd_plano
        WHERE v.nr_id_telegram = $1 AND v.tp_status = $2 AND v.ts_expiracao > $3`,
@@ -2486,7 +2487,8 @@ app.post("/api/watch-video", async (req, res) => {
     const filme = filmeRows[0];
 
     const { rows: acessos } = await pool.query(
-      `SELECT v.*, p.nm_categoria AS "planoCategoria"
+      `SELECT v.*,
+              (p.nm_categoria || ',' || COALESCE(array_to_string(p.nm_categorias_adicionais, ','), '')) AS "planoCategoria"
        FROM "VENDAS" v
        LEFT JOIN "PLANOS" p ON p.cd_plano = v.cd_plano
        WHERE v.nr_id_telegram = $1 AND v.tp_status = $2 AND v.ts_expiracao > $3`,
@@ -2651,7 +2653,8 @@ app.get("/api/smart-stream", async (req, res) => {
 
     // 1. MURALHA DE SEGURANÇA SÊNIOR (🚀 A linha que tinha sumido voltou aqui!)
     const { rows: acessos } = await pool.query(
-      `SELECT v.cd_conteudo, p.nm_categoria AS "planoCategoria"
+      `SELECT v.cd_conteudo,
+              (p.nm_categoria || ',' || COALESCE(array_to_string(p.nm_categorias_adicionais, ','), '')) AS "planoCategoria"
        FROM "VENDAS" v
        LEFT JOIN "PLANOS" p ON p.cd_plano = v.cd_plano
        WHERE v.nr_id_telegram = $1 AND v.tp_status = $2 AND v.ts_expiracao > $3`,

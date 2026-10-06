@@ -1251,6 +1251,17 @@ header {
   padding-top: max(72px, calc(64px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
 }
 
+/* Em telas menores (ex: iPhone SE, telas curtas no geral) o piso fixo de
+   72px comia espaço demais — essa folga é pra não ficar embaixo dos botões
+   nativos do Telegram, mas em tela curta não precisa de tanto. */
+@media (max-height: 700px) {
+  header,
+  .details-header,
+  .drama-request-header {
+    padding-top: max(56px, calc(50px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
+  }
+}
+
 
 /* =================================================================
    PROTEÇÃO CONTRA PULL-TO-CLOSE / SWIPE DOWN NO IOS TELEGRAM
