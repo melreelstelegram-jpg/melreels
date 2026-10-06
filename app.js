@@ -2186,7 +2186,7 @@ app.get("/api/my-contents", async (req, res) => {
     // 2. Busca o Catálogo
     const { rows: listaFinal } = await pool.query('SELECT * FROM "CONTEUDOS" ORDER BY ts_criacao DESC');
 
-    if (categoriasNorm.includes("todas")) return res.json(listaFinal); // VIP TUDO
+    if (categoriasNorm.some(c => c.includes("todas"))) return res.json(listaFinal); // VIP TUDO
 
     // 3. O Filtro Mágico com Sinônimos
     const listaSegura = listaFinal.filter(item => {
@@ -2197,7 +2197,7 @@ app.get("/api/my-contents", async (req, res) => {
       
       return categoriasNorm.some(catPlano => {
           // 🚀 BLINDAGEM: Aceita qualquer variação da palavra!
-          if (catPlano === 'todas' || catPlano === 'tudo' || catPlano === 'todos') return true;
+          if (catPlano.includes('todas') || catPlano.includes('tudo') || catPlano.includes('todos')) return true;
           
           // Aliases Automáticos
           if (catPlano.includes('asiatica') && catItem.includes('dorama')) return true;
@@ -2524,7 +2524,7 @@ app.post("/api/watch-video", async (req, res) => {
         if (!a.planoCategoria) return false;
 
         const catPlano = normCat(a.planoCategoria);
-        if (catPlano === 'todas' || catPlano === 'tudo' || catPlano === 'todos') return true;
+        if (catPlano.includes('todas') || catPlano.includes('tudo') || catPlano.includes('todos')) return true;
 
         if (catPlano.includes('asiatica') && catConteudo.includes('dorama')) return true;
         if (catPlano.includes('dorama') && catConteudo.includes('asiatica')) return true;
@@ -2703,7 +2703,7 @@ app.get("/api/smart-stream", async (req, res) => {
 
         const catPlano = normCat(a.planoCategoria);
         // 🚀 BLINDAGEM: Aceita qualquer variação
-        if (catPlano === 'todas' || catPlano === 'tudo' || catPlano === 'todos') return true;
+        if (catPlano.includes('todas') || catPlano.includes('tudo') || catPlano.includes('todos')) return true;
 
         if (catPlano.includes('asiatica') && catConteudo.includes('dorama')) return true;
         if (catPlano.includes('dorama') && catConteudo.includes('asiatica')) return true;

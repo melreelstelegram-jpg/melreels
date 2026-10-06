@@ -179,7 +179,7 @@ function isItemUnlocked(item) {
         const catPlano = (userStatusData.categoria || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const catFilme = (item.nm_categoria || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         
-        if (catPlano === 'todas') return true;
+        if (catPlano.includes('todas')) return true;
         
         // 🧠 Inteligência de Sinônimos (Trata erros de digitação e gêneros)
         if (catPlano.includes('asiatica') && catFilme.includes('dorama')) return true;
