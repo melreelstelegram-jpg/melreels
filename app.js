@@ -2125,7 +2125,9 @@ app.get("/api/user-status", async (req, res) => {
     const agora = new Date().toISOString();
     // Busca todas as vendas ativas que são de Planos (Assinaturas)
     const { rows: vendas } = await pool.query(
-      `SELECT v.ts_expiracao, p.nm_categoria AS "planoCategoria", p.nm_plano AS "planoNome"
+      `SELECT v.ts_expiracao,
+              (p.nm_categoria || ',' || COALESCE(array_to_string(p.nm_categorias_adicionais, ','), '')) AS "planoCategoria",
+              p.nm_plano AS "planoNome"
        FROM "VENDAS" v
        LEFT JOIN "PLANOS" p ON p.cd_plano = v.cd_plano
        WHERE v.nr_id_telegram = $1 AND v.tp_status = $2 AND v.ts_expiracao > $3

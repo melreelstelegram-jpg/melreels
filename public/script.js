@@ -251,6 +251,7 @@ function renderHome() {
 
     // 1. Destaques (Carrossel)
     renderSlider(fullCatalog.filter(i => i.sn_destaque));
+    bindAppsBarClicks();
 
     // 2. Renderiza TODOS os 12 filmes na grade
     renderTop12("top-12-grid", allTopItems);
@@ -707,23 +708,41 @@ function clearSearch() {
 }
 
 
+// Escapa texto pra uso seguro dentro de atributos/HTML — evita que um nome
+// de app com aspas, & ou <> quebre a estrutura da página.
+function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+}
+
 // Barrinha de ícones dos apps de origem (ReelShort, DramaBox etc.) — mesma
 // feature do yarinreels_web, lendo a tabela APPS_NAVEGACAO compartilhada.
+// Usa data-app (lido via listener depois de inserir no DOM) em vez de
+// onclick inline, pra não depender de escapar string dentro de string.
 function generateAppsBarHTML() {
     if (!fullApps.length) return "";
 
     return `
         <div class="apps-bar">
             ${fullApps.map(app => `
-                <div class="apps-bar-item" onclick="abrirAppOrigem('${app.nm_app.replace(/'/g, "\\'")}')">
+                <div class="apps-bar-item" data-app="${escapeHtml(app.nm_app)}">
                     <div class="apps-bar-icon">
-                        <img src="${app.ds_icone}" alt="${app.nm_app}" loading="lazy" />
+                        <img src="${escapeHtml(app.ds_icone)}" alt="${escapeHtml(app.nm_app)}" loading="lazy" />
                     </div>
-                    <span>${app.nm_app}</span>
+                    <span>${escapeHtml(app.nm_app)}</span>
                 </div>
             `).join("")}
         </div>
     `;
+}
+
+// Liga o clique de cada ícone da barra de apps — chamado depois do innerHTML
+// ser inserido no DOM (os elementos não existem antes disso).
+function bindAppsBarClicks() {
+    document.querySelectorAll("#home .apps-bar-item").forEach((el) => {
+        el.onclick = () => abrirAppOrigem(el.dataset.app);
+    });
 }
 
 function abrirAppOrigem(nomeApp) {
