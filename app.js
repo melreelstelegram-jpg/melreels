@@ -2226,6 +2226,20 @@ app.get("/api/plans", async (req, res) => {
   }
 });
 
+// Apps de origem (ReelShort, DramaBox etc.) — mesma tabela APPS_NAVEGACAO
+// gerenciada pelo painel do yarin; aqui só lê pra mostrar a barrinha de
+// ícones no Mini App e filtrar o catálogo por nm_app_origem.
+app.get("/api/apps", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      'SELECT cd_app, nm_app, ds_icone FROM "APPS_NAVEGACAO" WHERE sn_visivel = true ORDER BY nr_ordem ASC, nm_app ASC'
+    );
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: "Erro ao carregar apps" });
+  }
+});
+
 // Chave Pix manual — último recurso quando EFÍ e Mercado Pago falham os
 // dois. Cliente paga direto nessa chave e manda o comprovante pro suporte,
 // que libera manualmente (Gerenciar Cliente no /admin).

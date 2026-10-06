@@ -63,6 +63,7 @@ tg.setHeaderColor("#000000");
 tg.setBackgroundColor("#000000");
 
 let fullCatalog = [];
+let fullApps = [];
 let currentPixCode = "";
 let userId = 0;
 let sliderInterval;
@@ -108,6 +109,7 @@ async function init() {
   try {
     const reqUserStatus = fetchUserStatus().catch(e => console.error(e));
     const reqCatalog = fetch("/api/catalog").then(r => r.json()).catch(e => { console.error(e); return []; });
+    const reqApps = fetch("/api/apps").then(r => r.json()).catch(e => []);
     const reqMyContents = (userId !== 0) 
       ? fetch(`/api/my-contents?userId=${userId}`).then(r => r.json()).catch(e => [])
       : Promise.resolve([]);
@@ -115,12 +117,15 @@ async function init() {
       ? fetch(`/api/historico?userId=${userId}&_t=${Date.now()}`).then(r => r.json()).catch(e => [])
       : Promise.resolve([]);
 
-    const [_, catalogData, myContentsData, historicoData] = await Promise.all([
+    const [_, catalogData, appsData, myContentsData, historicoData] = await Promise.all([
       reqUserStatus,
       reqCatalog,
+      reqApps,
       reqMyContents,
       reqHistorico
     ]);
+
+    fullApps = Array.isArray(appsData) ? appsData : [];
 
     if (Array.isArray(myContentsData)) {
       userPurchasedIds = myContentsData.map(i => i.cd_conteudo);
@@ -223,6 +228,8 @@ function renderHome() {
             <div class="hero-slider" id="hero-slider"></div>
             <div class="slider-dots" id="slider-dots"></div>
         </div>
+
+        ${generateAppsBarHTML()}
 
         <div class="section-header">
             <span>TOP 12 <i class="fas fa-fire" style="color: var(--main-red);"></i></span>
@@ -699,6 +706,42 @@ function clearSearch() {
   }
 }
 
+
+// Barrinha de ícones dos apps de origem (ReelShort, DramaBox etc.) — mesma
+// feature do yarinreels_web, lendo a tabela APPS_NAVEGACAO compartilhada.
+function generateAppsBarHTML() {
+    if (!fullApps.length) return "";
+
+    return `
+        <div class="apps-bar">
+            ${fullApps.map(app => `
+                <div class="apps-bar-item" onclick="abrirAppOrigem('${app.nm_app.replace(/'/g, "\\'")}')">
+                    <div class="apps-bar-icon">
+                        <img src="${app.ds_icone}" alt="${app.nm_app}" loading="lazy" />
+                    </div>
+                    <span>${app.nm_app}</span>
+                </div>
+            `).join("")}
+        </div>
+    `;
+}
+
+function abrirAppOrigem(nomeApp) {
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+    document.getElementById("category-page-title").innerText = nomeApp;
+
+    document.querySelectorAll(".container").forEach((c) => c.classList.remove("active"));
+    const target = document.getElementById("category-page");
+    target.style.display = "block";
+    target.classList.add("active");
+
+    const items = fullCatalog.filter(i => (i.nm_app_origem || "") === nomeApp);
+
+    baseCategoryItems = items;
+    currentPage = 1;
+    currentCategoryItems = items;
+    renderFullGrid();
+}
 
 // Abre a página de catálogo completo
 function openCategoryPage(title) {
