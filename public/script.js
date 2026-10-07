@@ -251,7 +251,6 @@ function renderHome() {
 
     // 1. Destaques (Carrossel)
     renderSlider(fullCatalog.filter(i => i.sn_destaque));
-    bindAppsBarClicks();
 
     // 2. Renderiza TODOS os 12 filmes na grade
     renderTop12("top-12-grid", allTopItems);
@@ -737,13 +736,17 @@ function generateAppsBarHTML() {
     `;
 }
 
-// Liga o clique de cada ícone da barra de apps — chamado depois do innerHTML
-// ser inserido no DOM (os elementos não existem antes disso).
-function bindAppsBarClicks() {
-    document.querySelectorAll("#home .apps-bar-item").forEach((el) => {
-        el.onclick = () => abrirAppOrigem(el.dataset.app);
-    });
-}
+// Listener delegado (ligado uma única vez, nunca precisa religar) — o
+// switchTab('home') só reconstrói o innerHTML da Home na PRIMEIRA vez
+// (isHomeRendered), então um listener direto nos itens da barra de apps
+// ficava órfão depois da primeira renderização. Delegando no document,
+// funciona sempre, não importa quantas vezes o HTML da Home for recriado.
+document.addEventListener("click", (e) => {
+    const item = e.target.closest(".apps-bar-item");
+    if (item && item.dataset.app) {
+        abrirAppOrigem(item.dataset.app);
+    }
+});
 
 function abrirAppOrigem(nomeApp) {
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
