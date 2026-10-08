@@ -7,14 +7,18 @@
     <!-- Scripts Externos -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <link rel="stylesheet" href="style.css?v=2.5" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css?v=2.6" />
 </head>
 <body>
 
     <!-- Overlay de Loading -->
     <div id="app-loader" class="loader-overlay">
-        <div class="spinner"></div>
-        <p>Carregando catálogo...</p>
+        <div class="loader-logo">MELREELS<span class="loader-crown">👑</span></div>
+        <p class="loader-tagline">Dramas e novelas sem limites</p>
+        <div class="loader-bar"><div class="loader-bar-fill"></div></div>
     </div>
 
     <!-- Cabeçalho Fixo -->
@@ -97,7 +101,7 @@
             <div style="display: flex; gap: 15px; margin-top: -60px; position: relative; z-index: 5;">
                 <img id="details-poster" src="" class="details-mini-poster">
                 <div style="padding-top: 65px;">
-                    <h2 id="details-title" style="margin: 0; font-size: 20px;"></h2>
+                    <h2 id="details-title" class="details-title"></h2>
                     <div class="details-meta">
                         <span id="details-year"></span>
                         <span id="details-duration" class="badge-outline"></span>
@@ -122,6 +126,10 @@
                 <button id="btn-main-buy" class="btn-buy-now">
                     <i class="fas fa-shopping-cart"></i> COMPRAR AGORA
                 </button>
+                <div class="details-trust">
+                    <i class="fas fa-lock"></i>
+                    <span>Pagamento seguro via Pix, direto no app. Liberação automática logo após a confirmação.</span>
+                </div>
             </div>
         </div>
     </main>
@@ -317,6 +325,6 @@
     </nav>
 
 	<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="script.js?v=2.5"></script>
+    <script src="script.js?v=2.6"></script>
 </body>
 </html>

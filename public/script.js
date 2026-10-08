@@ -49,6 +49,17 @@ function updateTelegramSafeArea() {
 updateTelegramSafeArea();
 
 let isHomeRendered = false;
+
+// Guarda a posição de rolagem da Home enquanto ela está visível, pra
+// restaurar depois — sem isso, voltar de uma categoria/filme/app sempre
+// jogava o usuário de volta pro topo, obrigando a rolar tudo de novo.
+let _homeScrollY = 0;
+window.addEventListener("scroll", () => {
+    const home = document.getElementById("home");
+    if (home && home.classList.contains("active")) {
+        _homeScrollY = window.scrollY;
+    }
+}, { passive: true });
 /* =================================================================
    MELREELS - SCRIPT OFICIAL DO MINI APP (Aprimorado)
    ================================================================= */
@@ -440,8 +451,8 @@ function renderSlider(items) {
     .map(
       (item) => `
         <div class="hero-item" style="background-image: url('${item.ds_url_poster}')">
-            <div class="hero-overlay" style="padding-bottom: 35px;">
-                <button onclick="openMovieDetails('${item.cd_conteudo}')" style="margin: 0 auto; width: 85%; max-width: 250px; background: var(--main-red); color: white;">
+            <div class="hero-overlay" style="padding-bottom: 28px;">
+                <button class="btn-hero-buy" onclick="openMovieDetails('${item.cd_conteudo}')">
                     <i class="fas fa-shopping-cart"></i> COMPRAR
                 </button>
             </div>
@@ -494,6 +505,14 @@ async function openMovieDetails(id) {
     document.getElementById("details-duration").innerText = `${item.nr_duracao_minutos || '--'} min`;
     document.getElementById("details-format").innerText = item.tp_formato || 'Filme';
     document.getElementById("details-synopsis").innerText = item.ds_descricao || 'Sem sinopse disponível.';
+
+    // Tags extras (Dublado/Legendado), igual referência — só aparece quando
+    // o idioma cadastrado deixa isso claro, sem inventar informação.
+    const idiomaLower = (item.nm_idioma || '').toLowerCase();
+    const tags = [];
+    if (idiomaLower.includes('dublado')) tags.push('<i class="fas fa-microphone"></i> Dublado');
+    if (idiomaLower.includes('legendado')) tags.push('<i class="fas fa-closed-captioning"></i> Legendado');
+    document.getElementById("details-tags").innerHTML = tags.map(t => `<span class="badge-outline">${t}</span>`).join("");
 
     // Referências dos Botões
     const btnBuyNow = document.getElementById("btn-main-buy");
@@ -1444,11 +1463,17 @@ function switchTab(tabId) {
   if (navEl) navEl.classList.add("active");
 
   if (tabId === "home") {
-    const searchInput = document.getElementById("search-input");
-    if (searchInput) searchInput.value = "";
+    // 🚀 Não limpa mais a busca aqui — isso rodava toda vez que o usuário
+    // voltava de uma categoria/filme/app (switchTab('home') é usado tanto
+    // pro botão "voltar" quanto pelo nav de baixo), obrigando a pesquisar
+    // tudo de novo. Só limpa quando o usuário realmente pede (botão "X").
     if (!isHomeRendered) {
       renderHome();
       isHomeRendered = true;
+    } else {
+      // Home já existia (não foi re-renderizada) — volta pro ponto exato
+      // onde o usuário tinha parado, em vez de jogar pro topo.
+      requestAnimationFrame(() => window.scrollTo(0, _homeScrollY));
     }
   }
   if (tabId === "mylist") {
