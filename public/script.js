@@ -752,7 +752,10 @@ function abrirAppOrigem(nomeApp) {
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
     document.getElementById("category-page-title").innerText = nomeApp;
 
-    document.querySelectorAll(".container").forEach((c) => c.classList.remove("active"));
+    document.querySelectorAll(".container").forEach((c) => {
+        c.classList.remove("active");
+        c.style.display = "none";
+    });
     const target = document.getElementById("category-page");
     target.style.display = "block";
     target.classList.add("active");
@@ -769,8 +772,11 @@ function abrirAppOrigem(nomeApp) {
 function openCategoryPage(title) {
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
     document.getElementById("category-page-title").innerText = title;
-    
-    document.querySelectorAll(".container").forEach((c) => c.classList.remove("active"));
+
+    document.querySelectorAll(".container").forEach((c) => {
+        c.classList.remove("active");
+        c.style.display = "none";
+    });
     const target = document.getElementById("category-page");
     target.style.display = "block";
     target.classList.add("active");
