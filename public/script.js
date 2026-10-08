@@ -473,9 +473,16 @@ function renderSlider(items) {
   }, 4000); 
 }
 
+// Evita que uma resposta antiga (de um toque anterior, mais lento) sobrescreva
+// a tela depois que o usuário já abriu outro filme — e serve de trava contra
+// cliques repetidos abrirem N requisições /api/check-payment em paralelo.
+let _detailsRequestId = 0;
+
 async function openMovieDetails(id) {
     const item = fullCatalog.find(i => i.cd_conteudo === id);
     if(!item) return;
+
+    const requestId = ++_detailsRequestId;
 
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
 
@@ -493,8 +500,20 @@ async function openMovieDetails(id) {
     const episodesContainer = document.getElementById("episodes-container");
     const btnPreview = document.getElementById("btn-preview");
 
+    // 🚀 Abre a tela JÁ, no mesmo toque — antes dependia do /api/check-payment
+    // responder pra tela aparecer, então numa rede lenta parecia que o toque
+    // não tinha feito nada e o cliente apertava de novo (e de novo).
+    document.querySelectorAll(".container").forEach(c => c.style.display = "none");
+    document.getElementById("movie-details").style.display = "block";
+
     // Garante que o botão principal sempre volte a aparecer (pode ter sido ocultado antes)
-    btnBuyNow.style.display = "flex"; 
+    btnBuyNow.style.display = "flex";
+    episodesContainer.style.display = "none";
+    btnBuyNow.innerHTML = `<i class="fas fa-spinner fa-spin"></i> VERIFICANDO...`;
+    btnBuyNow.style.background = "rgba(255,255,255,0.1)";
+    btnBuyNow.style.color = "white";
+    btnBuyNow.style.justifyContent = "center";
+    btnBuyNow.onclick = null;
 
     // 🚀 LÓGICA DO BOTÃO DE PRÉVIA (TRAILER YOUTUBE)
     if (item.ds_url_trailer_youtube && item.ds_url_trailer_youtube.length > 5) {
@@ -518,13 +537,17 @@ async function openMovieDetails(id) {
         const checkRes = await fetch(`/api/check-payment?userId=${userId}&contentId=${id}`);
         const checkData = await checkRes.json();
         
-        hasAccess = checkData.approved; 
-        
+        hasAccess = checkData.approved;
+
         // Aplica a inteligência de sinônimos local, caso exista a função
         if (!hasAccess && typeof isItemUnlocked === "function") {
             hasAccess = isItemUnlocked(item);
         }
     }
+
+    // Usuário já abriu outro filme enquanto essa checagem rodava — não
+    // atualiza a tela errada com uma resposta atrasada.
+    if (requestId !== _detailsRequestId) return;
 
     if (hasAccess) {
         // =======================================================
@@ -617,9 +640,6 @@ async function openMovieDetails(id) {
         tg.showAlert("🔗 Link copiado! Envie para seus amigos.");
     };
 
-    // Alterna visibilidade da tela
-    document.querySelectorAll(".container").forEach(c => c.style.display = "none");
-    document.getElementById("movie-details").style.display = "block";
 }
 function backToHome() {
     document.getElementById("movie-details").style.display = "none";
@@ -1018,9 +1038,17 @@ function iniciarPollingPagamento(modalidade, id) {
   }, 3000);
 }
 
+let _compraEmAndamento = false;
+
 async function processarCompra(id, titulo, modalidade, valorFinal) {
   if (userId === 0)
     return tg.showAlert("⚠️ Por favor, acesse o app através do Bot oficial para realizar compras.");
+
+  // Com EFI/MP falhando, cada tentativa pode demorar vários segundos (tenta
+  // os dois antes de desistir) — sem essa trava, um toque duplo por
+  // impaciência disparava N cobranças em paralelo pro mesmo item.
+  if (_compraEmAndamento) return;
+  _compraEmAndamento = true;
 
   tg.MainButton.setText(`PAGAR R$ ${parseFloat(valorFinal).toFixed(2)}`);
   tg.MainButton.show();
@@ -1076,6 +1104,7 @@ async function processarCompra(id, titulo, modalidade, valorFinal) {
   } finally {
     tg.MainButton.hide();
     tg.MainButton.hideProgress();
+    _compraEmAndamento = false;
   }
 }
 // --- 6. MINHA LISTA E ASSINATURAS ---
