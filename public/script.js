@@ -75,6 +75,12 @@ tg.setBackgroundColor("#000000");
 
 let fullCatalog = [];
 let fullApps = [];
+
+// Nome curto do Mini App configurado no @BotFather (/myapps ou /newapp),
+// usado pra montar o link direto t.me/<bot>/<nome>?startapp=<id> — esse
+// formato abre o filme direto, sem passar pela mensagem de /start do bot.
+// Deixa em branco até configurar lá; enquanto vazio, cai no link clássico.
+const MINIAPP_SHORT_NAME = "";
 let currentPixCode = "";
 let userId = 0;
 let sliderInterval;
@@ -150,8 +156,11 @@ async function init() {
     isHomeRendered = true;
 
     const urlParams = new URLSearchParams(window.location.search);
-    const movieId = urlParams.get("movie");
-    
+    // "movie" é o link clássico (?start=, mostra mensagem antes de abrir);
+    // "start_param" é o do link direto do Mini App (t.me/bot/app?startapp=),
+    // que abre o Mini App na hora, sem mensagem nenhuma do bot antes.
+    const movieId = urlParams.get("movie") || tg.initDataUnsafe?.start_param;
+
     if (movieId) {
         setTimeout(() => {
             openMovieDetails(movieId);
@@ -647,8 +656,10 @@ async function openMovieDetails(id) {
 
     // Botão Compartilhar
     document.getElementById("btn-share").onclick = () => {
-        const botInfo = tg.initDataUnsafe?.receiver || { username: "Melreels_bot" }; 
-        const shareLink = `https://t.me/${botInfo.username}?start=${item.cd_conteudo}`;
+        const botInfo = tg.initDataUnsafe?.receiver || { username: "Melreels_bot" };
+        const shareLink = MINIAPP_SHORT_NAME
+            ? `https://t.me/${botInfo.username}/${MINIAPP_SHORT_NAME}?startapp=${item.cd_conteudo}`
+            : `https://t.me/${botInfo.username}?start=${item.cd_conteudo}`;
         const el = document.createElement("textarea");
         el.value = shareLink;
         document.body.appendChild(el);
