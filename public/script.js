@@ -80,7 +80,7 @@ let fullApps = [];
 // usado pra montar o link direto t.me/<bot>/<nome>?startapp=<id> — esse
 // formato abre o filme direto, sem passar pela mensagem de /start do bot.
 // Deixa em branco até configurar lá; enquanto vazio, cai no link clássico.
-const MINIAPP_SHORT_NAME = "";
+const MINIAPP_SHORT_NAME = "app";
 let currentPixCode = "";
 let userId = 0;
 let sliderInterval;
