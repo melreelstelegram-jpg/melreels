@@ -227,7 +227,7 @@ function renderHome() {
         .slice(0, 12);
 
     homeContainer.innerHTML = `
-        <div style="display: flex; overflow-x: auto; gap: 10px; padding: 0 15px 15px; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-top: -5px;">
+        <div style="display: flex; overflow-x: auto; gap: 10px; padding: 0 15px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-top: -5px;">
             <div class="chip" onclick="openCategoryPage('Filme')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Filmes</div>
             <div class="chip" onclick="openCategoryPage('Série')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Séries</div>
             <div class="chip" onclick="openCategoryPage('Dorama')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Doramas</div>

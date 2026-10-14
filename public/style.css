@@ -119,18 +119,19 @@ header {
 
 header h1 {
   color: var(--main-red);
-  margin: 10px 0;
-  font-size: 24px;
-  letter-spacing: 4px;
+  margin: 2px 0 8px;
+  font-size: 15px;
+  letter-spacing: 2px;
   font-weight: 900;
   text-align: center;
   text-transform: uppercase;
+  opacity: 0.85;
 }
 
 .quick-actions-bar {
   display: flex;
   gap: 8px;
-  margin: 0 15px 10px;
+  margin: 0 15px 8px;
 }
 
 .quick-action-chip {
@@ -163,9 +164,9 @@ header h1 {
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   border-radius: 12px;
-  padding: 12px 15px;
+  padding: 10px 15px;
   display: flex; align-items: center;
-  margin: 0 15px 10px;
+  margin: 0 15px 8px;
   border: 1px solid var(--glass-border);
 }
 
@@ -1382,10 +1383,10 @@ body.vip-mode .nav-item.active span {
    CORREÇÃO DE OVERLAP DO CABEÇALHO DO TELEGRAM (SAFE AREA TOP FIX RESPONSIVO)
    ================================================================= */
 header {
-  padding-top: max(72px, calc(64px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
+  padding-top: max(48px, calc(40px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
   padding-left: 15px !important;
   padding-right: 15px !important;
-  padding-bottom: 10px !important;
+  padding-bottom: 8px !important;
   background: linear-gradient(to bottom, rgba(0,0,0,0.98) 0%, rgba(0,0,0,0.95) 75%, rgba(0,0,0,0.85) 100%) !important;
   position: sticky !important;
   top: 0 !important;
@@ -1398,7 +1399,7 @@ header {
   width: 100% !important;
   display: flex !important;
   justify-content: space-between !important;
-  padding-top: max(72px, calc(64px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
+  padding-top: max(48px, calc(40px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
   padding-left: 15px !important;
   padding-right: 15px !important;
   padding-bottom: 15px !important;
@@ -1407,17 +1408,17 @@ header {
 }
 
 .drama-request-header {
-  padding-top: max(72px, calc(64px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
+  padding-top: max(48px, calc(40px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
 }
 
-/* Em telas menores (ex: iPhone SE, telas curtas no geral) o piso fixo de
-   72px comia espaço demais — essa folga é pra não ficar embaixo dos botões
+/* Em telas menores (ex: iPhone SE, telas curtas no geral) o piso fixo
+   comia espaço demais — essa folga é pra não ficar embaixo dos botões
    nativos do Telegram, mas em tela curta não precisa de tanto. */
 @media (max-height: 700px) {
   header,
   .details-header,
   .drama-request-header {
-    padding-top: max(56px, calc(50px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
+    padding-top: max(38px, calc(32px + var(--tg-safe-top, env(safe-area-inset-top, 0px)))) !important;
   }
 }
 
