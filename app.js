@@ -2264,38 +2264,39 @@ async function criarVendaManual(insertData) {
 }
 
 // =================================================================
-// HELPER DE PAGAMENTO UNIFICADO (Efí Bank com Fallback para Mercado Pago)
+// HELPER DE PAGAMENTO UNIFICADO (Mercado Pago com Fallback para Efí Bank)
 // =================================================================
 async function gerarPixComFallback(valor, titulo, userId, idOrigem, modalidade) {
   let pix = null;
-  let efiErrorLog = null;
+  let mpErrorLog = null;
 
-  // 1. Tenta Efí Bank
+  // 1. Tenta Mercado Pago (prioridade — EFÍ com bloqueio de documento sem previsão de resolver)
   try {
-    console.log("⏳ [EFÍ] Solicitando criação da cobrança...");
-    pix = await efiService.gerarPix(valor, titulo, userId, idOrigem, modalidade);
-    return pix;
-  } catch (err) {
-    efiErrorLog = err?.mensagem || err?.message || JSON.stringify(err);
-    console.warn(`⚠️ [EFÍ] Falha ao gerar PIX (${efiErrorLog}). Acionando fallback do Mercado Pago...`);
-  }
-
-  // 2. Fallback Mercado Pago
-  try {
-    console.log("⏳ [MERCADO PAGO] Solicitando criação da cobrança via fallback...");
+    console.log("⏳ [MERCADO PAGO] Solicitando criação da cobrança...");
     pix = await mpService.gerarPix(valor, titulo, userId, idOrigem, modalidade);
     if (!pix) {
       throw new Error("Mercado Pago retornou nulo.");
     }
     console.log(`✅ [MERCADO PAGO] PIX criado com sucesso! ID: ${pix.txid}`);
     return pix;
-  } catch (mpErr) {
-    const rawCause = mpErr?.cause;
-    const mpErrorLog = rawCause
+  } catch (err) {
+    const rawCause = err?.cause;
+    mpErrorLog = rawCause
       ? (typeof rawCause === "object" ? JSON.stringify(rawCause) : rawCause)
-      : (mpErr?.message || JSON.stringify(mpErr));
-    console.error("❌ [MERCADO PAGO] Falha ao gerar PIX:", mpErrorLog);
-    throw new Error(`Erro nos meios de pagamento (Efí: ${efiErrorLog} | MP: ${mpErrorLog})`);
+      : (err?.message || JSON.stringify(err));
+    console.warn(`⚠️ [MERCADO PAGO] Falha ao gerar PIX (${mpErrorLog}). Acionando fallback da EFÍ...`);
+  }
+
+  // 2. Fallback Efí Bank
+  try {
+    console.log("⏳ [EFÍ] Solicitando criação da cobrança via fallback...");
+    pix = await efiService.gerarPix(valor, titulo, userId, idOrigem, modalidade);
+    console.log(`✅ [EFÍ] PIX criado com sucesso!`);
+    return pix;
+  } catch (efiErr) {
+    const efiErrorLog = efiErr?.mensagem || efiErr?.message || JSON.stringify(efiErr);
+    console.error("❌ [EFÍ] Falha ao gerar PIX:", efiErrorLog);
+    throw new Error(`Erro nos meios de pagamento (MP: ${mpErrorLog} | Efí: ${efiErrorLog})`);
   }
 }
 
