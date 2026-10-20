@@ -270,7 +270,7 @@ const adicionarDramaScene = new Scenes.WizardScene(
     ctx.wizard.state.payload.duracao = minutosTotais;
     
     
-    await ctx.reply("💻 Envie o **NOME DO ARQUIVO LOCAL** (ex: dorama.mp4) ou o **FILE ID DO TELEGRAM**:", { parse_mode: "Markdown" });
+    await ctx.reply("💻 Envie o **NOME DO ARQUIVO LOCAL** (ex: dorama.mp4), encaminhe o **VÍDEO do Telegram**, ou digite **PULAR** se só tiver a versão Legendada por enquanto (completa o Dublado depois com /dublado):", { parse_mode: "Markdown" });
     return ctx.wizard.next();
   },
 
@@ -280,8 +280,9 @@ const adicionarDramaScene = new Scenes.WizardScene(
 
     // 1. Se o admin mandou um texto (ex: filme.mp4 ou colou o ID na mão)
     if (ctx.message && ctx.message.text) {
-        videoId = ctx.message.text.trim();
-    } 
+        const texto = ctx.message.text.trim();
+        videoId = (texto.toUpperCase() === "PULAR") ? null : texto;
+    }
     // 2. 🚀 A MÁGICA: Se o admin encaminhou o próprio VÍDEO direto no chat!
     else if (ctx.message && ctx.message.video) {
         videoId = ctx.message.video.file_id;
@@ -463,88 +464,115 @@ bot.command("add_ep", (ctx) => {
 });
 
 // =================================================================
-// 🎞️ ATALHO RÁPIDO: /legendado — cadastra/remove a versão Legendada
-// sem precisar passar pela grade de edição inteira (pedido direto, pra
-// usar no celular sem complicação).
+// 🎞️ ATALHOS RÁPIDOS: /legendado e /dublado — cadastram/removem cada
+// versão sem precisar passar pela grade de edição inteira (pedido
+// direto, pra usar no celular sem complicação). O Legendado costuma
+// sair primeiro e o Dublado chega depois, então os dois slots
+// precisam poder ser preenchidos em qualquer ordem.
 // =================================================================
-const legendadoRapidoScene = new Scenes.WizardScene(
-  "LEGENDADO_RAPIDO_SCENE",
+function criarSceneVersaoRapida({ nomeCena, comando, label, colunaFileId, colunaBunny }) {
+  return new Scenes.WizardScene(
+    nomeCena,
 
-  // Passo 1: Pede o ID do conteúdo
-  async (ctx) => {
-    await ctx.reply("🎞️ **Versão Legendada — atalho rápido**\n\nEnvie o `ID (UUID)` do conteúdo (pode colar o link `...start=ID` também):", { parse_mode: "Markdown" });
-    return ctx.wizard.next();
-  },
+    // Passo 1: Pede o ID do conteúdo
+    async (ctx) => {
+      await ctx.reply(`🎞️ **Versão ${label} — atalho rápido**\n\nEnvie o `+"`ID (UUID)`"+` do conteúdo (pode colar o link `+"`...start=ID`"+` também):`, { parse_mode: "Markdown" });
+      return ctx.wizard.next();
+    },
 
-  // Passo 2: Valida o conteúdo e pede o vídeo/URL legendado
-  async (ctx) => {
-    if (!ctx.message || !ctx.message.text) return;
+    // Passo 2: Valida o conteúdo e pede o vídeo/URL
+    async (ctx) => {
+      if (!ctx.message || !ctx.message.text) return;
 
-    let conteudoId = ctx.message.text.trim();
-    if (conteudoId.includes("start=")) {
-      conteudoId = conteudoId.split("start=")[1].trim();
-    }
+      let conteudoId = ctx.message.text.trim();
+      if (conteudoId.includes("start=")) {
+        conteudoId = conteudoId.split("start=")[1].trim();
+      }
 
-    const { rows } = await pool.query('SELECT cd_conteudo, nm_titulo FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1', [conteudoId]);
-    const filme = rows[0];
-    if (!filme) {
-      await ctx.reply("❌ Conteúdo não encontrado. Verifique o ID e tente de novo (/legendado pra recomeçar).");
+      const { rows } = await pool.query('SELECT cd_conteudo, nm_titulo FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1', [conteudoId]);
+      const filme = rows[0];
+      if (!filme) {
+        await ctx.reply(`❌ Conteúdo não encontrado. Verifique o ID e tente de novo (/${comando} pra recomeçar).`);
+        return ctx.scene.leave();
+      }
+
+      ctx.wizard.state.conteudoId = filme.cd_conteudo;
+      ctx.wizard.state.nomeFilme = filme.nm_titulo;
+
+      await ctx.reply(`🛠️ **${filme.nm_titulo}**\n\nEnvie o **vídeo do Telegram** (encaminhando direto) OU a **URL do Bunny.net** da versão ${label.toLowerCase()}.\n\n*(Digite **PULAR** pra remover a versão ${label.toLowerCase()} cadastrada)*`, { parse_mode: "Markdown" });
+      return ctx.wizard.next();
+    },
+
+    // Passo 3: Salva no banco
+    async (ctx) => {
+      let fileId = null;
+      let bunnyUrl = null;
+      let removendo = false;
+
+      if (ctx.message && ctx.message.video) {
+        fileId = ctx.message.video.file_id;
+      } else if (ctx.message && ctx.message.document) {
+        fileId = ctx.message.document.file_id;
+      } else if (ctx.message && ctx.message.text) {
+        const texto = ctx.message.text.trim();
+        if (texto.toUpperCase() === "PULAR") {
+          removendo = true;
+        } else {
+          bunnyUrl = texto;
+        }
+      } else {
+        return;
+      }
+
+      try {
+        await pool.query(
+          `UPDATE "CONTEUDOS" SET "${colunaFileId}" = $1, "${colunaBunny}" = $2 WHERE cd_conteudo = $3`,
+          [fileId, bunnyUrl, ctx.wizard.state.conteudoId]
+        );
+        catalogCache.data = null;
+
+        await ctx.reply(
+          removendo
+            ? `✅ Versão ${label.toLowerCase()} **removida** de "${ctx.wizard.state.nomeFilme}".`
+            : `✅ Versão ${label.toLowerCase()} **salva** em "${ctx.wizard.state.nomeFilme}"!\n\nManda /${comando} de novo pra fazer outro.`,
+          { parse_mode: "Markdown" }
+        );
+      } catch (err) {
+        console.error(`❌ [ERRO ${label.toUpperCase()} RÁPIDO]:`, err.message);
+        await ctx.reply("❌ Erro ao salvar no banco de dados.");
+      }
       return ctx.scene.leave();
     }
+  );
+}
 
-    ctx.wizard.state.conteudoId = filme.cd_conteudo;
-    ctx.wizard.state.nomeFilme = filme.nm_titulo;
+const legendadoRapidoScene = criarSceneVersaoRapida({
+  nomeCena: "LEGENDADO_RAPIDO_SCENE",
+  comando: "legendado",
+  label: "Legendada",
+  colunaFileId: "ds_file_id_telegram_legendado",
+  colunaBunny: "ds_url_bunny_legendado",
+});
 
-    await ctx.reply(`🛠️ **${filme.nm_titulo}**\n\nEnvie o **vídeo do Telegram** (encaminhando direto) OU a **URL do Bunny.net** da versão legendada.\n\n*(Digite **PULAR** pra remover a versão legendada cadastrada)*`, { parse_mode: "Markdown" });
-    return ctx.wizard.next();
-  },
-
-  // Passo 3: Salva no banco
-  async (ctx) => {
-    let fileId = null;
-    let bunnyUrl = null;
-    let removendo = false;
-
-    if (ctx.message && ctx.message.video) {
-      fileId = ctx.message.video.file_id;
-    } else if (ctx.message && ctx.message.document) {
-      fileId = ctx.message.document.file_id;
-    } else if (ctx.message && ctx.message.text) {
-      const texto = ctx.message.text.trim();
-      if (texto.toUpperCase() === "PULAR") {
-        removendo = true;
-      } else {
-        bunnyUrl = texto;
-      }
-    } else {
-      return;
-    }
-
-    try {
-      await pool.query(
-        `UPDATE "CONTEUDOS" SET ds_file_id_telegram_legendado = $1, ds_url_bunny_legendado = $2 WHERE cd_conteudo = $3`,
-        [fileId, bunnyUrl, ctx.wizard.state.conteudoId]
-      );
-      catalogCache.data = null;
-
-      await ctx.reply(
-        removendo
-          ? `✅ Versão legendada **removida** de "${ctx.wizard.state.nomeFilme}".`
-          : `✅ Versão legendada **salva** em "${ctx.wizard.state.nomeFilme}"!\n\nManda /legendado de novo pra fazer outro.`,
-        { parse_mode: "Markdown" }
-      );
-    } catch (err) {
-      console.error("❌ [ERRO LEGENDADO RÁPIDO]:", err.message);
-      await ctx.reply("❌ Erro ao salvar no banco de dados.");
-    }
-    return ctx.scene.leave();
-  }
-);
+const dubladoRapidoScene = criarSceneVersaoRapida({
+  nomeCena: "DUBLADO_RAPIDO_SCENE",
+  comando: "dublado",
+  label: "Dublada",
+  colunaFileId: "ds_file_id_telegram",
+  colunaBunny: "ds_url_bunny",
+});
 
 bot.command("legendado", (ctx) => {
     const admins = process.env.ADMIN_IDS.split(",");
     if (admins.includes(ctx.from.id.toString())) {
         ctx.scene.enter("LEGENDADO_RAPIDO_SCENE");
+    }
+});
+
+bot.command("dublado", (ctx) => {
+    const admins = process.env.ADMIN_IDS.split(",");
+    if (admins.includes(ctx.from.id.toString())) {
+        ctx.scene.enter("DUBLADO_RAPIDO_SCENE");
     }
 });
 
@@ -1994,7 +2022,8 @@ const stage = new Scenes.Stage([
   excluirPlanoScene,
   transmitirAvisoScene,
   avisarSerieScene,
-  legendadoRapidoScene
+  legendadoRapidoScene,
+  dubladoRapidoScene
 ]);
 // =================================================================
 // SISTEMA DE UPSELL INTELIGENTE - HELPER & SESSIONS
