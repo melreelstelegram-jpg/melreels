@@ -309,22 +309,46 @@ const adicionarDramaScene = new Scenes.WizardScene(
     return ctx.wizard.next();
   },
 
-  // Passo 14: Salva no Banco
+  // Passo 14: Versão Legendada (opcional)
   async (ctx) => {
     if (!ctx.message || !ctx.message.text) return;
     let fonte = ctx.message.text.trim().toUpperCase();
-    
+
     if (!["LOCAL", "BUNNY", "TELEGRAM"].includes(fonte)) {
-        fonte = "LOCAL"; 
+        fonte = "LOCAL";
     }
-    
+    ctx.wizard.state.payload.fonte = fonte;
+
+    await ctx.reply("🎞️ Esse conteúdo tem uma **versão LEGENDADA** separada?\n\nSe sim, envie o **vídeo do Telegram** dela ou a **URL do Bunny.net**.\n\n*(Se não tiver, digite **PULAR**)*", { parse_mode: "Markdown" });
+    return ctx.wizard.next();
+  },
+
+  // Passo 15: Salva no Banco
+  async (ctx) => {
+    let legendadoVideoId = null;
+    let legendadoBunnyUrl = null;
+
+    if (ctx.message && ctx.message.video) {
+        legendadoVideoId = ctx.message.video.file_id;
+    } else if (ctx.message && ctx.message.document) {
+        legendadoVideoId = ctx.message.document.file_id;
+    } else if (ctx.message && ctx.message.text) {
+        const texto = ctx.message.text.trim();
+        if (texto.toUpperCase() !== "PULAR") {
+            legendadoBunnyUrl = texto;
+        }
+    } else {
+        return;
+    }
+
     const p = ctx.wizard.state.payload;
-    const generosFinais = ctx.wizard.state.generos.join(", "); 
+    const fonte = p.fonte;
+    const generosFinais = ctx.wizard.state.generos.join(", ");
 
     try {
       await pool.query(
-        `INSERT INTO "CONTEUDOS" (nm_titulo, nm_categoria, tp_formato, dt_lancamento, nm_idioma, ds_descricao, ds_generos, ds_url_trailer_youtube, nr_duracao_minutos, vl_aluguel, vl_vitalicio, ds_url_poster, ds_file_id_telegram, ds_url_bunny, tp_fonte_prioritaria, sn_destaque)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)`,
+        `INSERT INTO "CONTEUDOS" (nm_titulo, nm_categoria, tp_formato, dt_lancamento, nm_idioma, ds_descricao, ds_generos, ds_url_trailer_youtube, nr_duracao_minutos, vl_aluguel, vl_vitalicio, ds_url_poster, ds_file_id_telegram, ds_url_bunny, tp_fonte_prioritaria, sn_destaque, ds_file_id_telegram_legendado, ds_url_bunny_legendado)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
         [
           p.nome,
           ctx.wizard.state.generos[0],
@@ -341,7 +365,9 @@ const adicionarDramaScene = new Scenes.WizardScene(
           p.video_id,
           p.bunny_url,
           fonte,
-          false
+          false,
+          legendadoVideoId,
+          legendadoBunnyUrl
         ]
       );
 
@@ -351,7 +377,8 @@ const adicionarDramaScene = new Scenes.WizardScene(
         `✅ **Cadastro Concluído (Padrão V2)!**\n\n` +
         `🍿 **${p.nome}** (${p.formato})\n` +
         `📡 Fonte: **${fonte}**\n` +
-        `⏱️ ${p.duracao} min | 💰 R$${p.preco_aluguel}`, 
+        `🎞️ Legendado: **${(legendadoVideoId || legendadoBunnyUrl) ? "SIM" : "NÃO"}**\n` +
+        `⏱️ ${p.duracao} min | 💰 R$${p.preco_aluguel}`,
         { parse_mode: "Markdown" }
       );
     } catch (err) {
@@ -995,6 +1022,8 @@ const atualizarFilmeScene = new Scenes.WizardScene(
           [{ text: "Tempo Vídeo", callback_data: "EDIT_nr_duracao_minutos" }, { text: "Trailer (YT)", callback_data: "EDIT_ds_url_trailer_youtube" }],
           [{ text: "Banner", callback_data: "EDIT_ds_url_poster" }, { text: "Link Bunny", callback_data: "EDIT_ds_url_bunny" }],
           [{ text: "ID Local/TG", callback_data: "EDIT_ds_file_id_telegram" }, { text: "🔁 Fonte", callback_data: "EDIT_tp_fonte_prioritaria" }],
+          [{ text: "🎞️ Link Bunny (Legendado)", callback_data: "EDIT_ds_url_bunny_legendado" }],
+          [{ text: "🎞️ ID Local/TG (Legendado)", callback_data: "EDIT_ds_file_id_telegram_legendado" }],
           [{ text: "⏳ Carência de Lançamento", callback_data: "EDIT_sn_carencia_ativa" }],
           [{ text: "❌ Cancelar", callback_data: "CANCELAR_EDIT" }]
         ]
@@ -1056,7 +1085,9 @@ const atualizarFilmeScene = new Scenes.WizardScene(
       ds_url_poster: "a NOVA URL DO BANNER",
       ds_file_id_telegram: "o NOVO ARQUIVO LOCAL / ID",
       ds_url_bunny: "o NOVO LINK DO BUNNY.NET",
-      tp_fonte_prioritaria: "a FONTE (Digite apenas: LOCAL, BUNNY ou TELEGRAM)"
+      tp_fonte_prioritaria: "a FONTE (Digite apenas: LOCAL, BUNNY ou TELEGRAM)",
+      ds_url_bunny_legendado: "o LINK DO BUNNY.NET da versão LEGENDADA",
+      ds_file_id_telegram_legendado: "o ARQUIVO/ID DO TELEGRAM da versão LEGENDADA (pode encaminhar o vídeo direto)"
     };
 
     await ctx.reply(`✍️ Digite ${nomesAmigaveis[coluna]} para "${ctx.wizard.state.nomeFilme}":`);
@@ -1071,9 +1102,9 @@ const atualizarFilmeScene = new Scenes.WizardScene(
     // 🚀 A MÁGICA APLICADA: Agora aceita vídeo encaminhado se estiver editando o ID!
     if (ctx.message && ctx.message.text) {
         novoValor = ctx.message.text.trim();
-    } else if (ctx.message && ctx.message.video && coluna === "ds_file_id_telegram") {
+    } else if (ctx.message && ctx.message.video && (coluna === "ds_file_id_telegram" || coluna === "ds_file_id_telegram_legendado")) {
         novoValor = ctx.message.video.file_id; // Extrai o ID do vídeo!
-    } else if (ctx.message && ctx.message.document && coluna === "ds_file_id_telegram") {
+    } else if (ctx.message && ctx.message.document && (coluna === "ds_file_id_telegram" || coluna === "ds_file_id_telegram_legendado")) {
         novoValor = ctx.message.document.file_id; // Extrai o ID se for documento!
     } else {
         return; // Escudo: Ignora se mandar algo nada a ver e continua esperando
@@ -1088,7 +1119,8 @@ const atualizarFilmeScene = new Scenes.WizardScene(
       "nm_titulo", "nm_categoria", "ds_descricao", "vl_aluguel", "vl_vitalicio",
       "dt_lancamento", "nm_idioma", "ds_generos", "nr_duracao_minutos",
       "ds_url_trailer_youtube", "ds_url_poster", "ds_file_id_telegram",
-      "ds_url_bunny", "tp_fonte_prioritaria"
+      "ds_url_bunny", "tp_fonte_prioritaria",
+      "ds_url_bunny_legendado", "ds_file_id_telegram_legendado"
     ];
 
     try {
@@ -2497,7 +2529,8 @@ app.get("/api/check-payment", async (req, res) => {
 
 // Entrega de Vídeo Via Bot (Mensagem Direta)
 app.post("/api/watch-video", async (req, res) => {
-  const { cd_conteudo, nr_id_telegram, episodioId } = req.body;
+  const { cd_conteudo, nr_id_telegram, episodioId, versao } = req.body;
+  const sufixoVersao = versao === "legendado" ? "_legendado" : "";
 
   try {
     const { rows: filmeRows } = await pool.query('SELECT * FROM "CONTEUDOS" WHERE cd_conteudo = $1 LIMIT 1', [cd_conteudo]);
@@ -2560,8 +2593,9 @@ app.post("/api/watch-video", async (req, res) => {
         fileIdParaEnviar = ep.ds_file_id_telegram;
         legenda = `📺 <b>${filme.nm_titulo}</b>\n🎬 EP ${ep.nr_episodio}: ${ep.nm_titulo}\n\n🍿 Conteúdo Protegido Melreels.`;
     } else {
-        fileIdParaEnviar = filme.ds_file_id_telegram;
-        legenda = `🎬 <b>${filme.nm_titulo}</b>\n\n🍿 Conteúdo Protegido Melreels.`;
+        // Cai pro arquivo normal se não tiver versão legendada cadastrada.
+        fileIdParaEnviar = filme[`ds_file_id_telegram${sufixoVersao}`] || filme.ds_file_id_telegram;
+        legenda = `🎬 <b>${filme.nm_titulo}</b>${sufixoVersao ? " (Legendado)" : ""}\n\n🍿 Conteúdo Protegido Melreels.`;
     }
 
     // DISPARA A MENSAGEM COM PROTEÇÃO TOTAL
@@ -2659,7 +2693,10 @@ app.get("/api/video/:filename", async (req, res) => {
 // 🧠 ROTEADOR INTELIGENTE DE STREAMING (LOCAL / BUNNY / TELEGRAM)
 // =================================================================
 app.get("/api/smart-stream", async (req, res) => {
-  const { cd_conteudo, userId, episodioId } = req.query;
+  const { cd_conteudo, userId, episodioId, versao } = req.query;
+  // "legendado" usa as colunas _legendado (só existem em CONTEUDOS, não em
+  // EPISODIOS) — qualquer outro valor (ou ausente) usa a versão normal/dublada.
+  const sufixoVersao = versao === "legendado" ? "_legendado" : "";
 
   try {
     // 0. Bloqueio de acesso anônimo
@@ -2764,7 +2801,7 @@ app.get("/api/smart-stream", async (req, res) => {
     for (const tentativa of cascata) {
 
         if (tentativa === 'LOCAL') {
-            const filename = videoData.ds_file_id_telegram;
+            const filename = videoData[`ds_file_id_telegram${sufixoVersao}`];
             if (!filename) continue;
             // Arquivo local tem extensão de vídeo; Telegram ID é string longa sem ponto
             const ehArquivoLocal = /\.(mp4|mkv|avi|mov|webm)$/i.test(filename);
@@ -2781,16 +2818,17 @@ app.get("/api/smart-stream", async (req, res) => {
         }
 
         if (tentativa === 'BUNNY') {
-            if (!videoData.ds_url_bunny) {
+            const bunnyUrl = videoData[`ds_url_bunny${sufixoVersao}`];
+            if (!bunnyUrl) {
                 console.log(`⚠️ [CASCATA BUNNY] URL não cadastrada. Tentando próxima fonte...`);
                 continue;
             }
             console.log(`🐇 [CASCATA BUNNY] Redirecionando para CDN Bunny.net...`);
-            return res.redirect(302, videoData.ds_url_bunny);
+            return res.redirect(302, bunnyUrl);
         }
 
         if (tentativa === 'TELEGRAM') {
-            const fileId = videoData.ds_file_id_telegram;
+            const fileId = videoData[`ds_file_id_telegram${sufixoVersao}`];
             if (!fileId) { console.log(`⚠️ [CASCATA TELEGRAM] file_id não cadastrado.`); continue; }
             // Telegram file_id: string longa (60+ chars) sem extensão
             if (fileId.length <= 45 || fileId.includes('.')) {

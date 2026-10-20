@@ -525,8 +525,10 @@ async function openMovieDetails(id) {
 
     // Referências dos Botões
     const btnBuyNow = document.getElementById("btn-main-buy");
+    const btnLegendado = document.getElementById("btn-main-buy-legendado");
     const episodesContainer = document.getElementById("episodes-container");
     const btnPreview = document.getElementById("btn-preview");
+    const temLegendado = !!(item.ds_url_bunny_legendado || item.ds_file_id_telegram_legendado);
 
     // 🚀 Abre a tela JÁ, no mesmo toque — antes dependia do /api/check-payment
     // responder pra tela aparecer, então numa rede lenta parecia que o toque
@@ -536,12 +538,14 @@ async function openMovieDetails(id) {
 
     // Garante que o botão principal sempre volte a aparecer (pode ter sido ocultado antes)
     btnBuyNow.style.display = "flex";
+    btnLegendado.style.display = "none";
     episodesContainer.style.display = "none";
     btnBuyNow.innerHTML = `<i class="fas fa-spinner fa-spin"></i> VERIFICANDO...`;
     btnBuyNow.style.background = "rgba(255,255,255,0.1)";
     btnBuyNow.style.color = "white";
     btnBuyNow.style.justifyContent = "center";
     btnBuyNow.onclick = null;
+    btnLegendado.onclick = null;
 
     // 🚀 LÓGICA DO BOTÃO DE PRÉVIA (TRAILER YOUTUBE)
     if (item.ds_url_trailer_youtube && item.ds_url_trailer_youtube.length > 5) {
@@ -624,20 +628,32 @@ async function openMovieDetails(id) {
         } else if (item.tp_fonte_prioritaria === 'TELEGRAM') {
             // ✈️ 2. FILMES NO TELEGRAM: Botão Verde que envia direto pro chat!
             episodesContainer.style.display = "none";
-            btnBuyNow.innerHTML = `<i class="fab fa-telegram-plane" style="margin-right: 6px;"></i> RECEBER NO CHAT`;
-            btnBuyNow.style.background = "#25D366"; 
+            btnBuyNow.innerHTML = `<i class="fab fa-telegram-plane" style="margin-right: 6px;"></i> ${temLegendado ? "RECEBER DUBLADO" : "RECEBER NO CHAT"}`;
+            btnBuyNow.style.background = "#25D366";
             btnBuyNow.style.color = "white";
             btnBuyNow.style.justifyContent = "center";
             btnBuyNow.onclick = () => entregarPeloBot(item.cd_conteudo); // Função universal sem passar episódio
 
+            if (temLegendado) {
+                btnLegendado.style.display = "flex";
+                btnLegendado.innerHTML = `<i class="fas fa-closed-captioning"></i> RECEBER LEGENDADO`;
+                btnLegendado.onclick = () => entregarPeloBot(item.cd_conteudo, null, "legendado");
+            }
+
         } else {
             // ▶️ 3. FILMES LOCAL/BUNNY: Abre no Web Player interno normalmente
             episodesContainer.style.display = "none";
-            btnBuyNow.innerHTML = `<i class="fas fa-play"></i> ASSISTIR AGORA`;
-            btnBuyNow.style.background = "#00ff41"; 
+            btnBuyNow.innerHTML = `<i class="fas fa-play"></i> ${temLegendado ? "ASSISTIR DUBLADO" : "ASSISTIR AGORA"}`;
+            btnBuyNow.style.background = "#00ff41";
             btnBuyNow.style.color = "black";
             btnBuyNow.style.justifyContent = "center";
             btnBuyNow.onclick = () => assistir(item.cd_conteudo, item.nm_titulo);
+
+            if (temLegendado) {
+                btnLegendado.style.display = "flex";
+                btnLegendado.innerHTML = `<i class="fas fa-closed-captioning"></i> ASSISTIR LEGENDADO`;
+                btnLegendado.onclick = () => assistir(item.cd_conteudo, `${item.nm_titulo} (Legendado)`, null, "legendado");
+            }
         }
 
     } else {
@@ -1231,13 +1247,14 @@ async function assinarPlano(id, nome, valor) {
 // --- 7. PLAYER DE VÍDEO ---
 // Sempre passa pelo backend (/api/smart-stream) para validação de acesso e cascata automática.
 // O HLS é detectado pelos metadados do catálogo (nunca pela URL direta do Bunny).
-async function assistir(conteudoId, titulo, episodioId = null) {
+async function assistir(conteudoId, titulo, episodioId = null, versao = null) {
     sendHeartbeat(conteudoId);
     const item = fullCatalog.find(i => i.cd_conteudo === conteudoId);
 
     // Sempre usa o backend — o cascata decide LOCAL/BUNNY/TELEGRAM após validar o acesso
     let streamUrl = `/api/smart-stream?userId=${userId}&cd_conteudo=${conteudoId}`;
     if (episodioId) streamUrl += `&episodioId=${episodioId}`;
+    if (versao) streamUrl += `&versao=${versao}`;
 
     // 🚀 Checa o acesso ANTES de abrir o player. Sem isso, um bloqueio (carência,
     // plano incompatível, etc.) fazia o vídeo simplesmente não abrir, sem
@@ -1406,7 +1423,7 @@ function closePlayer() {
 }
 
 // Função direta: Funciona para Séries (com episodioId) ou Filmes (sem episodioId)
-async function entregarPeloBot(conteudoId, episodioId = null) {
+async function entregarPeloBot(conteudoId, episodioId = null, versao = null) {
     if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("heavy");
     
     const idFresco = updateUserId();
@@ -1424,10 +1441,11 @@ async function entregarPeloBot(conteudoId, episodioId = null) {
         const res = await fetch("/api/watch-video", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ 
-                cd_conteudo: conteudoId, 
-                nr_id_telegram: idFresco, 
-                episodioId: episodioId 
+            body: JSON.stringify({
+                cd_conteudo: conteudoId,
+                nr_id_telegram: idFresco,
+                episodioId: episodioId,
+                versao: versao
             }),
         });
 
