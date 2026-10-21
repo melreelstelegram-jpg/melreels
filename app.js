@@ -455,13 +455,10 @@ const adicionarEpisodioScene = new Scenes.WizardScene(
   }
 );
 
-// E lá nos seus comandos, ative a cena:
-bot.command("add_ep", (ctx) => {
-    const admins = process.env.ADMIN_IDS.split(",");
-    if (admins.includes(ctx.from.id.toString())) {
-        ctx.scene.enter("ADICIONAR_EPISODIO_SCENE");
-    }
-});
+// /add_ep fica registrado mais abaixo, DEPOIS de bot.use(stage.middleware())
+// — ctx.scene só existe a partir dali (estava mudo digitado assim; o botão
+// "Adicionar Episódio" do /admin sempre funcionou porque entra na mesma
+// cena por um bot.action registrado depois da stage).
 
 // =================================================================
 // 🎞️ ATALHOS RÁPIDOS: /legendado e /dublado — cadastram/removem cada
@@ -562,19 +559,9 @@ const dubladoRapidoScene = criarSceneVersaoRapida({
   colunaBunny: "ds_url_bunny",
 });
 
-bot.command("legendado", (ctx) => {
-    const admins = process.env.ADMIN_IDS.split(",");
-    if (admins.includes(ctx.from.id.toString())) {
-        ctx.scene.enter("LEGENDADO_RAPIDO_SCENE");
-    }
-});
-
-bot.command("dublado", (ctx) => {
-    const admins = process.env.ADMIN_IDS.split(",");
-    if (admins.includes(ctx.from.id.toString())) {
-        ctx.scene.enter("DUBLADO_RAPIDO_SCENE");
-    }
-});
+// bot.command("legendado"/"dublado") ficam registrados mais abaixo, DEPOIS
+// de bot.use(stage.middleware()) — ctx.scene só existe a partir dali (igual
+// todo outro comando/ação que faz ctx.scene.enter nesse arquivo).
 
 // Listener Global para cancelar a qualquer momento
 adicionarDramaScene.action("CANCELAR_ADD", async (ctx) => {
@@ -2156,6 +2143,27 @@ bot.use((ctx, next) => {
   return next();
 });
 bot.use(stage.middleware());
+
+bot.command("add_ep", (ctx) => {
+    const admins = process.env.ADMIN_IDS.split(",");
+    if (admins.includes(ctx.from.id.toString())) {
+        ctx.scene.enter("ADICIONAR_EPISODIO_SCENE");
+    }
+});
+
+bot.command("legendado", (ctx) => {
+    const admins = process.env.ADMIN_IDS.split(",");
+    if (admins.includes(ctx.from.id.toString())) {
+        ctx.scene.enter("LEGENDADO_RAPIDO_SCENE");
+    }
+});
+
+bot.command("dublado", (ctx) => {
+    const admins = process.env.ADMIN_IDS.split(",");
+    if (admins.includes(ctx.from.id.toString())) {
+        ctx.scene.enter("DUBLADO_RAPIDO_SCENE");
+    }
+});
 
 // =================================================================
 // 3. ROTAS DA API (PARA O MINI APP)
