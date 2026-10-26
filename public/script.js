@@ -1595,6 +1595,15 @@ function fecharSolicitarDrama() {
   document.getElementById("drama-request-screen").style.display = "none";
 }
 
+function abrirTermos() {
+  if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+  document.getElementById("termos-screen").style.display = "flex";
+}
+
+function fecharTermos() {
+  document.getElementById("termos-screen").style.display = "none";
+}
+
 async function enviarSolicitacaoDrama() {
   const input = document.getElementById("drama-title-input");
   const titulo = input.value.trim();

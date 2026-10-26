@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=3.1" />
+    <link rel="stylesheet" href="style.css?v=3.2" />
 </head>
 <body>
 
@@ -168,12 +168,42 @@
             <button onclick="fecharMenuSuporte(); openSupport();" style="width: 100%; padding: 14px; background: var(--main-red); color: white; border: none; border-radius: 8px; font-weight: 900; margin-bottom: 10px; cursor: pointer;">
                 💬 FALAR COM SUPORTE
             </button>
-            <button onclick="fecharMenuSuporte(); abrirSolicitarDrama();" style="width: 100%; padding: 14px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer;">
+            <button onclick="fecharMenuSuporte(); abrirSolicitarDrama();" style="width: 100%; padding: 14px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; font-weight: bold; margin-bottom: 10px; cursor: pointer;">
                 🎬 SOLICITAR UM DRAMA
+            </button>
+            <button onclick="fecharMenuSuporte(); abrirTermos();" style="width: 100%; padding: 14px; background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; font-weight: bold; margin-bottom: 15px; cursor: pointer;">
+                📜 TERMOS DE USO
             </button>
             <button onclick="fecharMenuSuporte()" class="btn-close" style="width: 100%; padding: 12px; background: transparent; color: var(--text-gray); border: none; font-weight: bold; cursor: pointer;">
                 CANCELAR
             </button>
+        </div>
+    </div>
+
+    <!-- Tela dedicada: Termos de Uso -->
+    <div id="termos-screen" class="termos-screen">
+        <div class="termos-header">
+            <button class="drama-request-back" onclick="fecharTermos()"><i class="fas fa-arrow-left"></i></button>
+            <span>Termos de Uso</span>
+        </div>
+        <div class="termos-body">
+            <h2>Termos de Uso e Política de Reembolso</h2>
+            <p class="termos-data">Última atualização: 05/08/2026</p>
+
+            <h3>1. Natureza do produto</h3>
+            <p>Os conteúdos disponibilizados nesta plataforma (aluguel, vitalício ou assinatura) são produtos digitais de acesso imediato: ao concluir o pagamento, o título fica disponível para assistir na hora, sem qualquer período de espera ou entrega física.</p>
+
+            <h3>2. Política de não-reembolso</h3>
+            <p>Por se tratar de conteúdo digital consumido imediatamente após a compra, e conforme o Art. 49 do Código de Defesa do Consumidor (que trata do direito de arrependimento em compras fora do estabelecimento comercial), o direito de arrependimento não se aplica a partir do momento em que o conteúdo é acessado. Não realizamos reembolsos de compras já assistidas, integral ou parcialmente.</p>
+
+            <h3>3. Contestação de estorno (chargeback)</h3>
+            <p>Ao confirmar o pagamento, você concorda que teve acesso ao conteúdo contratado e que qualquer estorno solicitado à operadora do cartão ou instituição de pagamento após o consumo do produto poderá ser contestado por nós junto ao banco, mediante apresentação do registro de aceite destes Termos (data, hora e identificação do usuário) e do histórico de acesso ao conteúdo.</p>
+
+            <h3>4. Assinaturas</h3>
+            <p>Assinaturas podem ser canceladas a qualquer momento falando com o suporte. O cancelamento interrompe a renovação futura, mas não gera reembolso proporcional do período já pago — o acesso permanece ativo até o fim do ciclo vigente.</p>
+
+            <h3>5. Uso da conta</h3>
+            <p>O acesso é pessoal e intransferível. Compartilhamento de credenciais, tentativas de download não autorizado ou uso fraudulento podem resultar em suspensão da conta sem aviso prévio.</p>
         </div>
     </div>
 
@@ -328,6 +358,6 @@
     </nav>
 
 	<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="script.js?v=3.1"></script>
+    <script src="script.js?v=3.2"></script>
 </body>
 </html>
