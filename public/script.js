@@ -172,7 +172,9 @@ async function init() {
       loader.style.opacity = "0";
       setTimeout(() => (loader.style.display = "none"), 250);
     }
-	
+
+    setTimeout(() => exibirTermosPrimeiraVezSeNecessario(), movieId ? 700 : 400);
+
 	setInterval(() => sendHeartbeat(), 30000);
     sendHeartbeat();
 
@@ -1595,6 +1597,9 @@ function fecharSolicitarDrama() {
   document.getElementById("drama-request-screen").style.display = "none";
 }
 
+const TERMOS_STORAGE_KEY = "melreels_termos_vistos_v1";
+let _termosExibicaoForcada = false;
+
 function abrirTermos() {
   if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
   document.getElementById("termos-screen").style.display = "flex";
@@ -1602,6 +1607,24 @@ function abrirTermos() {
 
 function fecharTermos() {
   document.getElementById("termos-screen").style.display = "none";
+
+  if (_termosExibicaoForcada) {
+    _termosExibicaoForcada = false;
+    try { localStorage.setItem(TERMOS_STORAGE_KEY, "1"); } catch (e) {}
+    abrirMenuSuporte();
+  }
+}
+
+// Mostra os Termos de Uso automaticamente na primeira vez que o usuário
+// (novo ou antigo) abre o app, só uma única vez, e ao fechar leva pro Suporte.
+function exibirTermosPrimeiraVezSeNecessario() {
+  try {
+    if (localStorage.getItem(TERMOS_STORAGE_KEY)) return;
+  } catch (e) {
+    return;
+  }
+  _termosExibicaoForcada = true;
+  abrirTermos();
 }
 
 async function enviarSolicitacaoDrama() {
