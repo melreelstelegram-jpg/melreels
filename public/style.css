@@ -629,6 +629,15 @@ header h1 {
   margin: 0;
 }
 
+.termos-footer {
+  flex-shrink: 0;
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: #0a0a0a;
+  display: flex;
+  justify-content: center;
+}
+
 /* --- CORREÇÃO MINHA LISTA / RESULTADO DE BUSCA --- */
 #mylist-grid, #search-grid {
     display: grid;
