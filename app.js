@@ -2185,8 +2185,14 @@ app.get("/api/catalog", async (req, res) => {
     inicioMes.setHours(0, 0, 0, 0);
     const isoInicioMes = inicioMes.toISOString();
 
-    // 1. Busca todos os filmes do catálogo
-    const { rows: conteudos } = await pool.query('SELECT * FROM "CONTEUDOS"');
+    // 1. Busca todos os filmes do catálogo (com contagem de episódios pra exibir
+    // "N episódios" na tela de detalhes sem precisar buscar os episódios inteiros,
+    // o que vazaria ds_file_id_telegram/ds_url_bunny de conteúdo ainda não liberado)
+    const { rows: conteudos } = await pool.query(`
+      SELECT c.*,
+        (SELECT COUNT(*) FROM "EPISODIOS" e WHERE e.cd_conteudo = c.cd_conteudo)::int AS nr_episodios
+      FROM "CONTEUDOS" c
+    `);
 
     // 2. BUSCA VENDAS DO MÊS JÁ PROCESSADAS PELA VIEW (Sem limite de 1000 linhas)
     const { rows: vendasMastigadas } = await pool.query('SELECT cd_conteudo, total_vendas FROM vw_ranking_mensal');

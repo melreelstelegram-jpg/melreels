@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=3.5" />
+    <link rel="stylesheet" href="style.css?v=3.6" />
 </head>
 <body>
 
@@ -23,17 +23,17 @@
 
     <!-- Cabeçalho Fixo -->
     <header>
-        <div class="search-container">
-            <i class="fas fa-search"></i>
-            <input type="text" id="search-input" placeholder="Pesquisar dramas, filmes..." onkeyup="filterCatalog()" />
-            <i class="fas fa-times-circle clear-search" id="clear-search" onclick="clearSearch()" style="display: none; cursor: pointer"></i>
-        </div>
-        <div class="quick-actions-bar">
-            <button class="quick-action-chip" onclick="abrirSolicitarDrama()">
-                <i class="fas fa-clapperboard"></i> Pedir um Drama
+        <div class="home-topbar">
+            <div class="home-logo">MELREELS<span class="home-logo-crown">👑</span></div>
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-input" placeholder="Pesquisar dramas, filmes..." onkeyup="filterCatalog()" />
+                <i class="fas fa-times-circle clear-search" id="clear-search" onclick="clearSearch()" style="display: none; cursor: pointer"></i>
+            </div>
+            <button class="icon-btn-request" onclick="abrirSolicitarDrama()" title="Pedir um Drama">
+                <i class="fas fa-clapperboard"></i>
             </button>
         </div>
-        <h1>MELREELS</h1>
     </header>
 
     <!-- Página Inicial (Home) -->
@@ -363,6 +363,6 @@
     </nav>
 
 	<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="script.js?v=3.5"></script>
+    <script src="script.js?v=3.6"></script>
 </body>
 </html>

@@ -117,62 +117,91 @@ header {
   z-index: 2000;
 }
 
-header h1 {
+/* --- TOPO COMPACTO: LOGO + BUSCA + PEDIR UM DRAMA NUMA LINHA SO --- */
+.home-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.home-logo {
   color: var(--main-red);
-  margin: 0 0 6px;
-  font-size: 13px;
-  letter-spacing: 2px;
+  font-size: 12px;
+  letter-spacing: 1.5px;
   font-weight: 900;
-  text-align: center;
   text-transform: uppercase;
   opacity: 0.85;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
-.quick-actions-bar {
-  display: flex;
-  gap: 8px;
-  margin: 0 15px 6px;
+.home-logo-crown {
+  margin-left: 2px;
 }
 
-.quick-action-chip {
-  flex: 1;
+.icon-btn-request {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
   background: var(--glass);
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   border: 1px solid var(--glass-border);
-  color: white;
-  padding: 8px;
   border-radius: 10px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.quick-action-chip i {
   color: var(--main-red);
-  font-size: 13px;
+  font-size: 15px;
+  cursor: pointer;
 }
 
 /* --- PESQUISA GLASSMORPHISM --- */
 .search-container {
+  flex: 1;
+  min-width: 0;
   background: var(--glass);
   backdrop-filter: blur(15px);
   -webkit-backdrop-filter: blur(15px);
   border-radius: 12px;
   padding: 8px 14px;
   display: flex; align-items: center;
-  margin: 0 15px 6px;
   border: 1px solid var(--glass-border);
 }
 
 .search-container input {
   background: transparent; border: none; color: white;
   width: 100%; margin-left: 10px; outline: none;
+  min-width: 0;
+}
+
+/* --- ABAS DE CATEGORIA DA HOME (ESTILO SUBLINHADO) --- */
+.home-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 18px;
+  padding: 10px 15px 0;
+  margin-top: -5px;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.home-tabs::-webkit-scrollbar { display: none; }
+
+.home-tab {
+  flex-shrink: 0;
+  padding: 0 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-gray);
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.home-tab:active {
+  color: white;
+  border-bottom-color: var(--main-red);
 }
 
 /* --- SECTION HEADERS --- */
@@ -284,6 +313,37 @@ header h1 {
   object-position: center; /* Centraliza o corte */
   border-radius: 8px;
   box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+}
+
+.card-badges {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 2;
+}
+
+.card-badge {
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.3px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  color: white;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+}
+
+.badge-novo {
+  background: #d4af37;
+  color: #1a1200;
+}
+
+.badge-dublado {
+  background: #8b2fc9;
 }
 
 .card-mini .rank-number {
@@ -978,7 +1038,7 @@ header h1 {
    MODO VIP PREMIUM (DOURADO)
    ================================================== */
 /* Muda a cor da Logo para Dourado Neon */
-body.vip-mode header h1 {
+body.vip-mode header .home-logo {
     color: #FFD700;
     text-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
 }
@@ -1434,7 +1494,7 @@ body.vip-mode .nav-item.active span {
 
 /* Redução de peso no Blur do CSS para garantir 60fps em aparelhos mais simples */
 @supports (-webkit-backdrop-filter: none) or (backdrop-filter: none) {
-  .search-container, .quick-action-chip {
+  .search-container, .icon-btn-request {
     backdrop-filter: blur(8px) !important;
     -webkit-backdrop-filter: blur(8px) !important;
   }

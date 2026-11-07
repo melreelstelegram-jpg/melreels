@@ -223,6 +223,25 @@ function precoExibicao(item) {
     return parseFloat(item.vl_vitalicio) || 0;
 }
 
+// 🚀 Tags "NOVO"/"DUBLADO" nos cards do catálogo (Top 12 fica de fora, é pequeno demais pra caber bonito).
+const DIAS_PARA_CONTAR_COMO_NOVO = 15;
+function gerarBadgesTopo(item) {
+    const badges = [];
+
+    if ((item.nm_idioma || "").toLowerCase().includes("dublado")) {
+        badges.push('<span class="card-badge badge-dublado">DUBLADO</span>');
+    }
+
+    if (item.dt_lancamento) {
+        const dias = (Date.now() - new Date(item.dt_lancamento).getTime()) / 86400000;
+        if (dias >= 0 && dias <= DIAS_PARA_CONTAR_COMO_NOVO) {
+            badges.push('<span class="card-badge badge-novo">NOVO</span>');
+        }
+    }
+
+    return badges.length ? `<div class="card-badges">${badges.join("")}</div>` : "";
+}
+
 // --- 3. RENDERIZAÇÃO DA HOME (ESTILO NETFLIX + TOP 12) ---
 function renderHome() {
     const homeContainer = document.getElementById("home");
@@ -236,12 +255,12 @@ function renderHome() {
         .slice(0, 12);
 
     homeContainer.innerHTML = `
-        <div style="display: flex; overflow-x: auto; gap: 10px; padding: 0 15px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; margin-top: -5px;">
-            <div class="chip" onclick="openCategoryPage('Filme')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Filmes</div>
-            <div class="chip" onclick="openCategoryPage('Série')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Séries</div>
-            <div class="chip" onclick="openCategoryPage('Dorama')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Doramas</div>
-            <div class="chip" onclick="openCategoryPage('Short')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Shorts</div>
-            <div class="chip" onclick="openCategoryPage('Animação')" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">Animes</div>
+        <div class="home-tabs">
+            <div class="home-tab" onclick="openCategoryPage('Filme')">Filmes</div>
+            <div class="home-tab" onclick="openCategoryPage('Série')">Séries</div>
+            <div class="home-tab" onclick="openCategoryPage('Dorama')">Doramas</div>
+            <div class="home-tab" onclick="openCategoryPage('Short')">Shorts</div>
+            <div class="home-tab" onclick="openCategoryPage('Animação')">Animes</div>
         </div>
 
         <div style="position: relative;">
@@ -437,6 +456,7 @@ function renderRow(containerId, items, showRank) {
                      style="cursor: pointer;">
                 
                 ${showRank ? `<div class="rank-number">${item.rank_top}</div>` : ""}
+                ${gerarBadgesTopo(item)}
             </div>
             
             <div class="title">${item.nm_titulo}</div>
@@ -515,12 +535,17 @@ async function openMovieDetails(id) {
     document.getElementById("details-format").innerText = item.tp_formato || 'Filme';
     document.getElementById("details-synopsis").innerText = item.ds_descricao || 'Sem sinopse disponível.';
 
-    // Tags extras (Dublado/Legendado), igual referência — só aparece quando
-    // o idioma cadastrado deixa isso claro, sem inventar informação.
+    // Tags extras (Novo/Dublado/Legendado/Episódios), igual referência — só aparece quando
+    // o dado cadastrado deixa isso claro, sem inventar informação.
     const idiomaLower = (item.nm_idioma || '').toLowerCase();
     const tags = [];
+    if (item.dt_lancamento) {
+        const diasLancamento = (Date.now() - new Date(item.dt_lancamento).getTime()) / 86400000;
+        if (diasLancamento >= 0 && diasLancamento <= DIAS_PARA_CONTAR_COMO_NOVO) tags.push('<i class="fas fa-sparkles"></i> Novo');
+    }
     if (idiomaLower.includes('dublado')) tags.push('<i class="fas fa-microphone"></i> Dublado');
     if (idiomaLower.includes('legendado')) tags.push('<i class="fas fa-closed-captioning"></i> Legendado');
+    if (item.tp_formato === 'SERIE' && item.nr_episodios > 0) tags.push(`<i class="fas fa-tv"></i> ${item.nr_episodios} episódios`);
     document.getElementById("details-tags").innerHTML = tags.map(t => `<span class="badge-outline">${t}</span>`).join("");
 
     // Referências dos Botões
@@ -954,6 +979,7 @@ function renderFullGrid() {
     grid.innerHTML = itemsToShow.map(item => `
         <div class="card-mini">
             <img src="${item.ds_url_poster}" onclick="openMovieDetails('${item.cd_conteudo}')" style="cursor: pointer;">
+            ${gerarBadgesTopo(item)}
             <div class="title" style="font-size: 10px;">${item.nm_titulo}</div>
             <button class="btn-buy-small" onclick="openMovieDetails('${item.cd_conteudo}')">
                 DETALHES
@@ -1198,7 +1224,7 @@ async function loadMyList() {
         // (Sua lógica de VIP permanece igual aqui...)
         const usuarioEhVip = data && data.length > 20; 
         if (usuarioEhVip) { 
-            document.querySelector("header h1").innerHTML = 'MELREELS <span style="font-size: 16px;">👑</span>';
+            document.querySelector("header .home-logo").innerHTML = 'MELREELS <span style="font-size: 16px;">👑</span>';
         }
 
         if (!data || data.length === 0) {
@@ -1647,7 +1673,7 @@ async function fetchUserStatus() {
         if (userStatusData.isVip) {
             // ATIVA AS CORES DOURADAS NO CSS!
             document.body.classList.add('vip-mode');
-            document.querySelector("header h1").innerHTML = 'MELREELS<i class="fas fa-crown" style="font-size: 16px;"></i>';
+            document.querySelector("header .home-logo").innerHTML = 'MELREELS<i class="fas fa-crown" style="font-size: 16px;"></i>';
             
             // LÓGICA DE AVISO DE VENCIMENTO
             const exp = new Date(userStatusData.expira);
