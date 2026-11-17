@@ -204,6 +204,61 @@ header {
   border-bottom-color: var(--main-red);
 }
 
+.home-tab.active {
+  color: white;
+  border-bottom-color: var(--main-red);
+}
+
+/* --- CONTEÚDO DAS ABAS DA HOME (Início = carrosséis, resto = grade) --- */
+.home-tab-content { display: none; }
+.home-tab-content.active { display: block; }
+.home-tab-content.slide-in-left { animation: homeSlideInLeft .22s ease; }
+.home-tab-content.slide-in-right { animation: homeSlideInRight .22s ease; }
+@keyframes homeSlideInLeft {
+  from { opacity: 0; transform: translateX(30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes homeSlideInRight {
+  from { opacity: 0; transform: translateX(-30px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.home-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 15px;
+}
+
+.load-more-sentinel {
+  height: 1px;
+}
+
+/* --- PUXAR PRA ATUALIZAR (PULL-TO-REFRESH) --- */
+.ptr-indicator {
+  position: fixed;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2500;
+  transition: top .2s ease, opacity .2s ease;
+  opacity: 0;
+}
+
+.ptr-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255,255,255,0.15);
+  border-top-color: var(--main-red);
+  border-radius: 50%;
+  animation: ptrSpin .7s linear infinite;
+}
+
+@keyframes ptrSpin { to { transform: rotate(360deg); } }
+
 /* --- SECTION HEADERS --- */
 .section-header {
   padding: 8px 15px 4px;

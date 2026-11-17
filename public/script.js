@@ -246,11 +246,32 @@ function gerarBadgesTopo(item) {
     return badges.length ? `<div class="card-badges">${badges.join("")}</div>` : "";
 }
 
+// Abas da Home: "Início" mantém os carrosséis de sempre; as demais viram
+// grades com scroll infinito, trocando de conteúdo na própria tela (sem
+// navegar pra uma página separada) — e dá pra arrastar o dedo entre elas.
+const HOME_CATEGORY_TABS = [
+    { key: 'inicio', label: 'Início' },
+    { key: 'Filme', label: 'Filmes' },
+    { key: 'Série', label: 'Séries' },
+    { key: 'Dorama', label: 'Doramas' },
+    { key: 'Short', label: 'Shorts' },
+    { key: 'Animação', label: 'Animes' },
+];
+const HOME_GRID_PAGE_SIZE = 12;
+let homeGridState = {};
+let homeGridObserver = null;
+let currentHomeTabIndex = 0;
+let _homeSwipeBound = false;
+let _homePullBound = false;
+
 // --- 3. RENDERIZAÇÃO DA HOME (ESTILO NETFLIX + TOP 12) ---
 function renderHome() {
     const homeContainer = document.getElementById("home");
     document.getElementById("search-input").value = "";
     if(document.getElementById("category-page")) document.getElementById("category-page").style.display = "none";
+
+    homeGridState = {};
+    currentHomeTabIndex = 0;
 
     // Pega todo o Top 12 ordenado
     const allTopItems = fullCatalog
@@ -258,38 +279,47 @@ function renderHome() {
         .sort((a, b) => a.rank_top - b.rank_top)
         .slice(0, 12);
 
+    const tabsHtml = HOME_CATEGORY_TABS.map((t, i) =>
+        `<div class="home-tab${i === 0 ? ' active' : ''}" onclick="switchHomeTab(${i})">${t.label}</div>`
+    ).join("");
+
+    const gridPanelsHtml = HOME_CATEGORY_TABS.slice(1).map(t => `
+        <div class="home-tab-content" data-tab="${t.key}" id="hometab-${t.key}">
+            <div class="home-grid" id="grid-tab-${t.key}"></div>
+            <div class="load-more-sentinel" data-tab="${t.key}"></div>
+        </div>
+    `).join("");
+
     homeContainer.innerHTML = `
-        <div class="home-tabs">
-            <div class="home-tab" onclick="openCategoryPage('Filme')">Filmes</div>
-            <div class="home-tab" onclick="openCategoryPage('Série')">Séries</div>
-            <div class="home-tab" onclick="openCategoryPage('Dorama')">Doramas</div>
-            <div class="home-tab" onclick="openCategoryPage('Short')">Shorts</div>
-            <div class="home-tab" onclick="openCategoryPage('Animação')">Animes</div>
-        </div>
+        <div class="home-tabs" id="home-tabs-bar">${tabsHtml}</div>
 
-        <div style="position: relative;">
-            <div class="hero-slider" id="hero-slider"></div>
-            <div class="slider-dots" id="slider-dots"></div>
-        </div>
-
-        ${generateAppsBarHTML()}
-
-        <div class="section-header">
-            <span>TOP 12 <i class="fas fa-fire" style="color: var(--main-red);"></i></span>
-            <div class="nav-arrows" style="display: flex; gap: 15px; color: var(--text-gray); font-size: 18px;">
-                <i class="fas fa-chevron-left" onclick="document.getElementById('top-12-grid').scrollBy({left: -250, behavior: 'smooth'})" style="cursor: pointer;"></i>
-                <i class="fas fa-chevron-right" onclick="document.getElementById('top-12-grid').scrollBy({left: 250, behavior: 'smooth'})" style="cursor: pointer;"></i>
+        <div class="home-tab-content active" data-tab="inicio" id="hometab-inicio">
+            <div style="position: relative;">
+                <div class="hero-slider" id="hero-slider"></div>
+                <div class="slider-dots" id="slider-dots"></div>
             </div>
-        </div>
-        
-        <div class="top12-grid" id="top-12-grid"></div>
 
-        ${generateSectionHTML('Lançamentos')}
-        ${generateSectionHTML('Dublados')}
-        ${generateSectionHTML('Asiáticos', 'Dramas Asiáticos')} ${generateSectionHTML('Brasileiras')}
-        ${generateSectionHTML('Short', 'Reels & Shorts')}
-        ${generateSectionHTML('Masculino', 'Público Masculino')}
-        ${generateSectionHTML('Animação', 'Animes & IA')}
+            ${generateAppsBarHTML()}
+
+            <div class="section-header">
+                <span>TOP 12 <i class="fas fa-fire" style="color: var(--main-red);"></i></span>
+                <div class="nav-arrows" style="display: flex; gap: 15px; color: var(--text-gray); font-size: 18px;">
+                    <i class="fas fa-chevron-left" onclick="document.getElementById('top-12-grid').scrollBy({left: -250, behavior: 'smooth'})" style="cursor: pointer;"></i>
+                    <i class="fas fa-chevron-right" onclick="document.getElementById('top-12-grid').scrollBy({left: 250, behavior: 'smooth'})" style="cursor: pointer;"></i>
+                </div>
+            </div>
+
+            <div class="top12-grid" id="top-12-grid"></div>
+
+            ${generateSectionHTML('Lançamentos')}
+            ${generateSectionHTML('Dublados')}
+            ${generateSectionHTML('Asiáticos', 'Dramas Asiáticos')} ${generateSectionHTML('Brasileiras')}
+            ${generateSectionHTML('Short', 'Reels & Shorts')}
+            ${generateSectionHTML('Masculino', 'Público Masculino')}
+            ${generateSectionHTML('Animação', 'Animes & IA')}
+        </div>
+
+        ${gridPanelsHtml}
     `;
 
     // 1. Destaques (Carrossel)
@@ -360,7 +390,174 @@ function renderHome() {
         return cat.includes("anima") || gen.includes("anima") || cat.includes("ia") || gen.includes("i.a");
     }).slice(0,12);
     renderRow("animação-row", iaAnimes, false);
+
+    setupHomeGridObserver();
+    setupHomeSwipe();
+    setupHomePullToRefresh();
 }
+
+// Troca de aba da Home (clique no botão ou swipe) — "Início" mostra os
+// carrosséis de sempre, as outras mostram uma grade com scroll infinito.
+function switchHomeTab(index) {
+    if (index === currentHomeTabIndex || !HOME_CATEGORY_TABS[index]) return;
+
+    const direction = index > currentHomeTabIndex ? 'left' : 'right';
+    const target = HOME_CATEGORY_TABS[index];
+
+    document.querySelectorAll('#home .home-tab-content').forEach(el => {
+        el.classList.remove('active', 'slide-in-left', 'slide-in-right');
+    });
+    document.querySelectorAll('#home-tabs-bar .home-tab').forEach((btn, i) => {
+        btn.classList.toggle('active', i === index);
+    });
+
+    const panelId = target.key === 'inicio' ? 'hometab-inicio' : `hometab-${target.key}`;
+    const panel = document.getElementById(panelId);
+    if (panel) panel.classList.add('active', direction === 'left' ? 'slide-in-left' : 'slide-in-right');
+
+    currentHomeTabIndex = index;
+    window.scrollTo(0, 0);
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+
+    const activeBtn = document.querySelectorAll('#home-tabs-bar .home-tab')[index];
+    if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+    if (target.key !== 'inicio') initHomeGridTab(target.key);
+}
+
+// Inicializa (uma única vez por render da Home) a grade com scroll infinito de uma aba
+function initHomeGridTab(tipo) {
+    if (homeGridState[tipo]) return;
+    homeGridState[tipo] = { items: filtrarCatalogoPorTitulo(tipo), rendered: 0 };
+    renderMoreGridItems(tipo);
+}
+
+// Renderiza o próximo lote de itens da grade (chamado na inicialização e pelo IntersectionObserver)
+function renderMoreGridItems(tipo) {
+    const state = homeGridState[tipo];
+    const grid = document.getElementById(`grid-tab-${tipo}`);
+    const sentinel = document.querySelector(`.load-more-sentinel[data-tab="${tipo}"]`);
+    if (!state || !grid) return;
+
+    const proximos = state.items.slice(state.rendered, state.rendered + HOME_GRID_PAGE_SIZE);
+
+    if (!proximos.length) {
+        if (state.rendered === 0) {
+            grid.innerHTML = `<div style="grid-column: span 3; text-align: center; padding: 40px; color: gray;">Nenhum conteúdo nesta categoria ainda.</div>`;
+        }
+        if (sentinel) sentinel.style.display = 'none';
+        return;
+    }
+
+    grid.insertAdjacentHTML('beforeend', proximos.map(item => {
+        const liberado = isItemUnlocked(item);
+        const btnStyle = liberado ? "background: #00ff41; color: black;" : "background: rgba(255, 255, 255, 0.15); color: white;";
+        const btnIcon = liberado ? "fa-play" : "fa-plus";
+        const btnText = liberado ? "ASSISTIR" : "DETALHES";
+        return `
+            <div class="card-mini">
+                <img src="${item.ds_url_poster}" loading="lazy" onclick="openMovieDetails('${item.cd_conteudo}')" style="cursor: pointer;">
+                ${gerarBadgesTopo(item)}
+                <div class="title" style="font-size: 10px;">${item.nm_titulo}</div>
+                <button class="btn-buy-small" onclick="openMovieDetails('${item.cd_conteudo}')" style="${btnStyle}">
+                    <i class="fas ${btnIcon}"></i> ${btnText}
+                </button>
+            </div>
+        `;
+    }).join(""));
+
+    state.rendered += proximos.length;
+    if (sentinel) sentinel.style.display = state.rendered >= state.items.length ? 'none' : 'block';
+}
+
+// Observa os "sentinelas" no fim de cada grade pra carregar mais itens ao chegar perto do fim
+function setupHomeGridObserver() {
+    if (homeGridObserver) homeGridObserver.disconnect();
+    homeGridObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) renderMoreGridItems(entry.target.dataset.tab);
+        });
+    }, { rootMargin: '300px' });
+
+    document.querySelectorAll('#home .load-more-sentinel').forEach(el => homeGridObserver.observe(el));
+}
+
+// Arrastar o dedo pra esquerda/direita troca de aba — ignora o gesto se começou
+// dentro de um carrossel horizontal (hero, top 12, fileiras), pra não brigar
+// com o scroll deles.
+function setupHomeSwipe() {
+    if (_homeSwipeBound) return;
+    _homeSwipeBound = true;
+
+    const homeEl = document.getElementById('home');
+    let touchStartX = 0, touchStartY = 0, swipeBloqueado = false;
+
+    homeEl.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].screenX;
+        touchStartY = e.touches[0].screenY;
+        swipeBloqueado = !!e.target.closest('.hero-slider, .horizontal-scroll, .apps-bar, .top12-grid, .home-tabs');
+    }, { passive: true });
+
+    homeEl.addEventListener('touchend', (e) => {
+        if (swipeBloqueado) return;
+        const diffX = touchStartX - e.changedTouches[0].screenX;
+        const diffY = touchStartY - e.changedTouches[0].screenY;
+        if (Math.abs(diffX) > Math.abs(diffY) && Math.abs(diffX) > 60) {
+            if (diffX > 0) switchHomeTab(Math.min(currentHomeTabIndex + 1, HOME_CATEGORY_TABS.length - 1));
+            else switchHomeTab(Math.max(currentHomeTabIndex - 1, 0));
+        }
+    }, { passive: true });
+}
+
+// Puxar a tela pra baixo no topo recarrega o catálogo e reconstrói a Home
+function setupHomePullToRefresh() {
+    if (_homePullBound) return;
+    _homePullBound = true;
+
+    const homeEl = document.getElementById('home');
+    const ptr = document.getElementById('ptr-indicator');
+    let pullStart = 0, pulling = false, pullDiff = 0, refreshing = false;
+
+    homeEl.addEventListener('touchstart', (e) => {
+        if (window.scrollY === 0 && !refreshing) {
+            pullStart = e.touches[0].clientY;
+            pulling = true;
+        }
+    }, { passive: true });
+
+    homeEl.addEventListener('touchmove', (e) => {
+        if (!pulling || !ptr) return;
+        pullDiff = e.touches[0].clientY - pullStart;
+        if (pullDiff > 10) {
+            ptr.style.top = Math.min(pullDiff * 0.4, 50) + 'px';
+            ptr.style.opacity = Math.min(pullDiff / 80, 1);
+        }
+    }, { passive: true });
+
+    homeEl.addEventListener('touchend', async () => {
+        if (!pulling) return;
+        pulling = false;
+
+        if (pullDiff > 80 && ptr && !refreshing) {
+            refreshing = true;
+            ptr.style.top = '14px';
+            ptr.style.opacity = '1';
+            try {
+                const data = await fetch('/api/catalog').then(r => r.json());
+                fullCatalog = Array.isArray(data) ? data : [];
+                renderHome();
+            } catch (e) {}
+            ptr.style.top = '-40px';
+            ptr.style.opacity = '0';
+            refreshing = false;
+        } else if (ptr) {
+            ptr.style.top = '-40px';
+            ptr.style.opacity = '0';
+        }
+        pullDiff = 0;
+    }, { passive: true });
+}
+
 // 🚀 1. Função que avisa o servidor que o usuário está online
 async function sendHeartbeat(conteudoId = null) {
     if (!userId || userId === 0) return;
@@ -888,19 +1085,10 @@ function abrirAppOrigem(nomeApp) {
     renderFullGrid();
 }
 
-// Abre a página de catálogo completo
-function openCategoryPage(title) {
-    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
-    document.getElementById("category-page-title").innerText = title;
-
-    document.querySelectorAll(".container").forEach((c) => {
-        c.classList.remove("active");
-        c.style.display = "none";
-    });
-    const target = document.getElementById("category-page");
-    target.style.display = "block";
-    target.classList.add("active");
-
+// Filtro único usado tanto pela página de catálogo completo quanto pelas
+// abas-grade da Home (Filmes/Séries/Doramas/Shorts/Animes) — pra não ter
+// duas lógicas de "o que é essa categoria" divergindo com o tempo.
+function filtrarCatalogoPorTitulo(title) {
     let items = fullCatalog;
     const termo = title.toLowerCase();
 
@@ -917,15 +1105,15 @@ function openCategoryPage(title) {
             const dataB = b.dt_lancamento ? new Date(b.dt_lancamento) : new Date(0);
             return dataB - dataA;
         });
-    } else if (title === 'Short') { 
+    } else if (title === 'Short') {
         items = fullCatalog.filter(i => (i.nm_categoria || '').toLowerCase().includes('short') || (i.ds_generos || '').toLowerCase().includes('short'));
-    } else if (title === 'Animação') { 
+    } else if (title === 'Animação') {
         items = fullCatalog.filter(i => {
             const cat = (i.nm_categoria || "").toLowerCase();
             const gen = (i.ds_generos || "").toLowerCase();
             return cat.includes("anima") || gen.includes("anima") || cat.includes("ia") || gen.includes("i.a");
         });
-    } else if (title === 'Asiáticos') { 
+    } else if (title === 'Asiáticos') {
         // 🚀 NOVO: Inteligência pro botão "Ver Tudo" da nova fileira!
         items = fullCatalog.filter(i => {
             const cat = (i.nm_categoria || "").toLowerCase();
@@ -936,8 +1124,26 @@ function openCategoryPage(title) {
         items = fullCatalog.filter(i => (i.nm_categoria || '').toLowerCase().includes(termo) || (i.ds_generos || '').toLowerCase().includes(termo));
     }
 
+    return items;
+}
+
+// Abre a página de catálogo completo
+function openCategoryPage(title) {
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred("medium");
+    document.getElementById("category-page-title").innerText = title;
+
+    document.querySelectorAll(".container").forEach((c) => {
+        c.classList.remove("active");
+        c.style.display = "none";
+    });
+    const target = document.getElementById("category-page");
+    target.style.display = "block";
+    target.classList.add("active");
+
+    const items = filtrarCatalogoPorTitulo(title);
+
     // Salva na global, reseta pra página 1 e renderiza a grade
-    baseCategoryItems = items; 
+    baseCategoryItems = items;
     currentPage = 1;
     currentCategoryItems = items;
     renderFullGrid();

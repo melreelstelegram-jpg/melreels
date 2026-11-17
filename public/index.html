@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=3.7" />
+    <link rel="stylesheet" href="style.css?v=3.8" />
 </head>
 <body>
 
@@ -35,6 +35,9 @@
             </button>
         </div>
     </header>
+
+    <!-- Indicador de "puxar pra atualizar" da Home -->
+    <div id="ptr-indicator" class="ptr-indicator"><div class="ptr-spinner"></div></div>
 
     <!-- Página Inicial (Home) -->
     <main id="home" class="container active fade-in">
@@ -363,6 +366,37 @@
     </nav>
 
 	<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="script.js?v=3.7"></script>
+    <script src="script.js?v=3.8"></script>
+
+    <script>
+    // Bloqueia clique direito (inspecionar/salvar via menu de contexto)
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    });
+
+    // Bloqueia atalhos de teclado de desenvolvedor
+    document.addEventListener('keydown', function(e) {
+        // F12
+        if (e.keyCode === 123) { e.preventDefault(); return false; }
+        // Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C (inspecionar/console/seletor)
+        if (e.ctrlKey && e.shiftKey && [73, 74, 67].includes(e.keyCode)) { e.preventDefault(); return false; }
+        // Ctrl+U (ver código-fonte)
+        if (e.ctrlKey && e.keyCode === 85) { e.preventDefault(); return false; }
+        // Ctrl+S (salvar página)
+        if (e.ctrlKey && e.keyCode === 83) { e.preventDefault(); return false; }
+    });
+
+    // Detecta DevTools aberto (por diferença de tamanho da janela) e fecha a página
+    (function() {
+        var threshold = 160;
+        setInterval(function() {
+            if (window.outerWidth - window.innerWidth > threshold ||
+                window.outerHeight - window.innerHeight > threshold) {
+                document.body.innerHTML = '';
+                window.location.href = 'about:blank';
+            }
+        }, 1000);
+    })();
+    </script>
 </body>
 </html>
