@@ -317,6 +317,12 @@ function renderHome() {
             ${generateSectionHTML('Short', 'Reels & Shorts')}
             ${generateSectionHTML('Masculino', 'Público Masculino')}
             ${generateSectionHTML('Animação', 'Animes & IA')}
+
+            <div class="section-header">
+                <span>Mais Títulos</span>
+            </div>
+            <div class="home-grid" id="grid-tab-inicio"></div>
+            <div class="load-more-sentinel" data-tab="inicio"></div>
         </div>
 
         ${gridPanelsHtml}
@@ -391,6 +397,10 @@ function renderHome() {
     }).slice(0,12);
     renderRow("animação-row", iaAnimes, false);
 
+    // "Início" também tem scroll infinito — uma grade de "Mais Títulos" com
+    // tudo que não entrou no Top 12, carregada aos poucos ao rolar a tela.
+    initHomeGridTab('inicio');
+
     setupHomeGridObserver();
     setupHomeSwipe();
     setupHomePullToRefresh();
@@ -428,7 +438,10 @@ function switchHomeTab(index) {
 // Inicializa (uma única vez por render da Home) a grade com scroll infinito de uma aba
 function initHomeGridTab(tipo) {
     if (homeGridState[tipo]) return;
-    homeGridState[tipo] = { items: filtrarCatalogoPorTitulo(tipo), rendered: 0 };
+    const items = tipo === 'inicio'
+        ? fullCatalog.filter(i => !(i.rank_top > 0)) // "Mais Títulos" = tudo que não já apareceu no Top 12
+        : filtrarCatalogoPorTitulo(tipo);
+    homeGridState[tipo] = { items, rendered: 0 };
     renderMoreGridItems(tipo);
 }
 
