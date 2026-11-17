@@ -346,6 +346,10 @@ header {
   background: #8b2fc9;
 }
 
+.badge-legendado {
+  background: #1565c0;
+}
+
 .card-mini .rank-number {
   position: absolute;
   bottom: 30px;

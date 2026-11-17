@@ -232,6 +232,10 @@ function gerarBadgesTopo(item) {
         badges.push('<span class="card-badge badge-dublado">DUBLADO</span>');
     }
 
+    if (item.ds_url_bunny_legendado || item.ds_file_id_telegram_legendado) {
+        badges.push('<span class="card-badge badge-legendado">LEGENDADO</span>');
+    }
+
     if (item.dt_lancamento) {
         const dias = (Date.now() - new Date(item.dt_lancamento).getTime()) / 86400000;
         if (dias >= 0 && dias <= DIAS_PARA_CONTAR_COMO_NOVO) {
