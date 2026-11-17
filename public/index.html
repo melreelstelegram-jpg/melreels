@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=3.9" />
+    <link rel="stylesheet" href="style.css?v=4.0" />
 </head>
 <body>
 
@@ -39,36 +39,9 @@
     <!-- Indicador de "puxar pra atualizar" da Home -->
     <div id="ptr-indicator" class="ptr-indicator"><div class="ptr-spinner"></div></div>
 
-    <!-- Página Inicial (Home) -->
+    <!-- Página Inicial (Home) — conteúdo real é montado por renderHome() em script.js assim que o catálogo carrega -->
     <main id="home" class="container active fade-in">
-        <div style="position: relative">
-            <div class="hero-slider" id="hero-slider"></div>
-            <div class="slider-dots" id="slider-dots"></div>
-        </div>
-
-        <div class="section-header">
-            <span>TOP 12 <i class="fas fa-fire" style="color: var(--main-red); margin-left: 5px"></i></span>
-            <div class="nav-arrows">
-                <i class="fas fa-chevron-left"></i>
-                <i class="fas fa-chevron-right"></i>
-            </div>
-        </div>
-        <div class="horizontal-scroll" id="top-12-row"></div>
-
-        <div class="section-header">
-            <span>Lançamentos</span> <i class="fas fa-chevron-right"></i>
-        </div>
-        <div class="horizontal-scroll" id="lancamentos-row"></div>
-
-        <div class="section-header">
-            <span>Reels</span> <i class="fas fa-chevron-right"></i>
-        </div>
-        <div class="horizontal-scroll" id="reels-row"></div>
-
-        <div class="section-header">
-            <span>Animes & Curtas IA</span> <i class="fas fa-chevron-right"></i>
-        </div>
-        <div class="horizontal-scroll" id="ia-row"></div>
+        <div style="padding: 20px 15px; color: var(--text-gray); text-align: center; font-size: 13px;">Carregando catálogo...</div>
     </main>
 
     <!-- Minha Lista -->
@@ -366,7 +339,7 @@
     </nav>
 
 	<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="script.js?v=3.9"></script>
+    <script src="script.js?v=4.0"></script>
 
     <script>
     // Bloqueia clique direito (inspecionar/salvar via menu de contexto)

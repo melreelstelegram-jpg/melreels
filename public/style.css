@@ -295,53 +295,6 @@ header {
   font-size: 10px;
 }
 
-/* --- HERO SLIDER --- */
-.hero-slider {
-  display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  gap: 15px;
-  padding: 6px 15px;
-  scrollbar-width: none;
-}
-.hero-slider::-webkit-scrollbar { display: none; }
-
-.hero-item {
-  min-width: 88vw;
-  height: 380px;
-  border-radius: 16px;
-  background-size: cover;
-  background-position: center;
-  scroll-snap-align: center;
-  position: relative;
-}
-
-.btn-hero-buy {
-  margin: 0 auto;
-  width: fit-content;
-  padding: 11px 28px;
-  background: var(--main-red);
-  color: white;
-  border: none;
-  border-radius: 24px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.5px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 14px rgba(229, 9, 20, 0.35);
-}
-
-.hero-overlay {
-  position: absolute; bottom: 0;
-  width: 100%; height: 60%;
-  background: linear-gradient(to top, rgba(0,0,0,1), transparent);
-  display: flex; flex-direction: column;
-  justify-content: flex-end; padding: 25px;
-  text-align: center;
-}
-
 /* --- CARDS & RANKING (ESTILO NETFLIX) --- */
 .horizontal-scroll {
     display: flex;
@@ -403,19 +356,6 @@ header {
 
 .badge-legendado {
   background: #1565c0;
-}
-
-.card-mini .rank-number {
-  position: absolute;
-  bottom: 30px;
-  left: -18px;
-  font-size: 85px;
-  font-weight: 900;
-  color: #000;
-  -webkit-text-stroke: 2px #666;
-  z-index: 10;
-  line-height: 1;
-  pointer-events: none;
 }
 
 .card-mini .title {
@@ -976,123 +916,6 @@ header {
 .container { display: none; }
 .container.active { display: block; }
 
-.top12-grid {
-    display: grid;
-    grid-template-rows: repeat(3, 1fr);
-    grid-auto-flow: column;
-    grid-auto-columns: min(calc(50vw - 15px), 270px); /* Correção dinâmica para não vazar a tela */
-    gap: 15px 10px;
-    padding: 0 15px 12px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    will-change: scroll-position;
-    -webkit-transform: translateZ(0);
-    scroll-snap-type: x mandatory;
-}
-
-.top12-grid::-webkit-scrollbar { 
-    display: none; 
-}
-
-/* Faz com que cada bloco pare certinho na tela ao rolar */
-.card-top12 {
-    display: flex;
-    gap: 10px;
-    align-items: center;
-    background: transparent;
-    overflow: hidden;
-    scroll-snap-align: start; 
-}
-
-.card-top12-img-container {
-    position: relative; /* ISSO MANTÉM O NÚMERO DENTRO DA IMAGEM */
-    width: 75px;
-    min-width: 75px;
-    height: 105px;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-}
-
-.card-top12-img-container img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-	object-position: center;
-}
-
-/* A fitinha do Ranking */
-.top12-badge {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 25px;
-    height: 25px;
-    color: white;
-    font-size: 14px;
-    font-weight: 900;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-top-right-radius: 8px;
-    z-index: 5;
-}
-
-/* Cores do Pódio */
-.top12-badge.rank-1 { background: linear-gradient(135deg, #f1c40f, #f39c12); color: #000; text-shadow: none; }
-.top12-badge.rank-2 { background: linear-gradient(135deg, #bdc3c7, #95a5a6); color: #000; text-shadow: none; }
-.top12-badge.rank-3 { background: linear-gradient(135deg, #e67e22, #d35400); text-shadow: none; }
-.top12-badge.rank-other { background: var(--main-red); }
-
-.card-top12-info {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    flex: 1;
-}
-
-.card-top12-title {
-    font-size: 11px;
-    font-weight: bold;
-    color: white;
-    display: -webkit-box;
-    -webkit-line-clamp: 2; /* Corta o título com "..." se for muito grande */
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    line-height: 1.2;
-    margin-bottom: 4px;
-}
-
-.card-top12-price {
-    font-size: 11px;
-    font-weight: 800;
-    color: #ccc;
-    margin-bottom: 8px;
-}
-
-/* Botão de Comprar Branco Pílula (Igual a referência) */
-.btn-top12-buy {
-    background: white;
-    color: black;
-    border: none;
-    border-radius: 20px;
-    padding: 6px 12px;
-    font-size: 10px;
-    font-weight: 900;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    cursor: pointer;
-    width: fit-content;
-}
-
-.btn-top12-buy i {
-    font-size: 11px;
-}
-
 /* ==================================================
    MODO VIP PREMIUM (DOURADO)
    ================================================== */
@@ -1522,7 +1345,7 @@ body.vip-mode .nav-item.active span {
    ================================================================= */
 
 /* Placa de Vídeo / GPU Hardware Acceleration para rolagem e transições suaves */
-.horizontal-scroll, .top12-grid, .hero-slider, .grid {
+.horizontal-scroll, .home-grid, .grid {
   -webkit-overflow-scrolling: touch !important;
   scroll-behavior: smooth;
   will-change: scroll-position;
@@ -1534,7 +1357,7 @@ body.vip-mode .nav-item.active span {
 }
 
 /* Prevenção de Pulos de Layout (CLS) com Proporção de Aspecto (Aspect-Ratio) */
-.card img, .card-mini img, .card-top12 img, .details-mini-poster, .suggestion-cover img {
+.card img, .card-mini img, .details-mini-poster, .suggestion-cover img {
   aspect-ratio: 2 / 3;
   background-color: #1a1a1a;
   object-fit: cover;

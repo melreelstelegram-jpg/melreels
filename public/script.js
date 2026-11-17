@@ -83,7 +83,6 @@ let fullApps = [];
 const MINIAPP_SHORT_NAME = "app";
 let currentPixCode = "";
 let userId = 0;
-let sliderInterval;
 let userHistory = [];
 let progressInterval = null;
 let paymentPollingInterval;
@@ -246,15 +245,18 @@ function gerarBadgesTopo(item) {
     return badges.length ? `<div class="card-badges">${badges.join("")}</div>` : "";
 }
 
-// Abas da Home: "Início" mantém os carrosséis de sempre; as demais viram
-// grades com scroll infinito, trocando de conteúdo na própria tela (sem
-// navegar pra uma página separada) — e dá pra arrastar o dedo entre elas.
+// Abas da Home = as mesmas categorias que já existiam como carrosséis.
+// Cada aba é uma grade com scroll infinito, trocando de conteúdo na
+// própria tela (sem navegar pra uma página separada) — dá pra arrastar
+// o dedo entre elas. "Continuar Assistindo" e os Apps de Origem ficam
+// fixos acima das abas, visíveis em qualquer categoria selecionada.
 const HOME_CATEGORY_TABS = [
-    { key: 'inicio', label: 'Início' },
-    { key: 'Filme', label: 'Filmes' },
-    { key: 'Série', label: 'Séries' },
-    { key: 'Dorama', label: 'Doramas' },
+    { key: 'Lançamentos', label: 'Lançamentos' },
+    { key: 'Dublados', label: 'Dublados' },
+    { key: 'Asiáticos', label: 'Asiáticos' },
+    { key: 'Brasileiras', label: 'Brasileiras' },
     { key: 'Short', label: 'Shorts' },
+    { key: 'Masculino', label: 'Masculino' },
     { key: 'Animação', label: 'Animes' },
 ];
 const HOME_GRID_PAGE_SIZE = 12;
@@ -264,7 +266,7 @@ let currentHomeTabIndex = 0;
 let _homeSwipeBound = false;
 let _homePullBound = false;
 
-// --- 3. RENDERIZAÇÃO DA HOME (ESTILO NETFLIX + TOP 12) ---
+// --- 3. RENDERIZAÇÃO DA HOME (ABAS POR CATEGORIA COM SCROLL INFINITO) ---
 function renderHome() {
     const homeContainer = document.getElementById("home");
     document.getElementById("search-input").value = "";
@@ -273,141 +275,65 @@ function renderHome() {
     homeGridState = {};
     currentHomeTabIndex = 0;
 
-    // Pega todo o Top 12 ordenado
-    const allTopItems = fullCatalog
-        .filter(i => i.rank_top > 0)
-        .sort((a, b) => a.rank_top - b.rank_top)
-        .slice(0, 12);
-
     const tabsHtml = HOME_CATEGORY_TABS.map((t, i) =>
         `<div class="home-tab${i === 0 ? ' active' : ''}" onclick="switchHomeTab(${i})">${t.label}</div>`
     ).join("");
 
-    const gridPanelsHtml = HOME_CATEGORY_TABS.slice(1).map(t => `
-        <div class="home-tab-content" data-tab="${t.key}" id="hometab-${t.key}">
+    const gridPanelsHtml = HOME_CATEGORY_TABS.map((t, i) => `
+        <div class="home-tab-content${i === 0 ? ' active' : ''}" data-tab="${t.key}" id="hometab-${t.key}">
             <div class="home-grid" id="grid-tab-${t.key}"></div>
             <div class="load-more-sentinel" data-tab="${t.key}"></div>
         </div>
     `).join("");
 
     homeContainer.innerHTML = `
+        <div id="continue-watching-wrap"></div>
+
+        ${generateAppsBarHTML()}
+
         <div class="home-tabs" id="home-tabs-bar">${tabsHtml}</div>
-
-        <div class="home-tab-content active" data-tab="inicio" id="hometab-inicio">
-            <div style="position: relative;">
-                <div class="hero-slider" id="hero-slider"></div>
-                <div class="slider-dots" id="slider-dots"></div>
-            </div>
-
-            ${generateAppsBarHTML()}
-
-            <div class="section-header">
-                <span>TOP 12 <i class="fas fa-fire" style="color: var(--main-red);"></i></span>
-                <div class="nav-arrows" style="display: flex; gap: 15px; color: var(--text-gray); font-size: 18px;">
-                    <i class="fas fa-chevron-left" onclick="document.getElementById('top-12-grid').scrollBy({left: -250, behavior: 'smooth'})" style="cursor: pointer;"></i>
-                    <i class="fas fa-chevron-right" onclick="document.getElementById('top-12-grid').scrollBy({left: 250, behavior: 'smooth'})" style="cursor: pointer;"></i>
-                </div>
-            </div>
-
-            <div class="top12-grid" id="top-12-grid"></div>
-
-            ${generateSectionHTML('Lançamentos')}
-            ${generateSectionHTML('Dublados')}
-            ${generateSectionHTML('Asiáticos', 'Dramas Asiáticos')} ${generateSectionHTML('Brasileiras')}
-            ${generateSectionHTML('Short', 'Reels & Shorts')}
-            ${generateSectionHTML('Masculino', 'Público Masculino')}
-            ${generateSectionHTML('Animação', 'Animes & IA')}
-
-            <div class="section-header">
-                <span>Mais Títulos</span>
-            </div>
-            <div class="home-grid" id="grid-tab-inicio"></div>
-            <div class="load-more-sentinel" data-tab="inicio"></div>
-        </div>
 
         ${gridPanelsHtml}
     `;
 
-    // 1. Destaques (Carrossel)
-    renderSlider(fullCatalog.filter(i => i.sn_destaque));
-
-    // 2. Renderiza TODOS os 12 filmes na grade
-    renderTop12("top-12-grid", allTopItems);
-
-	// 🚀 LÓGICA DO CONTINUAR ASSISTINDO
+    // 🚀 LÓGICA DO CONTINUAR ASSISTINDO — fixo acima das abas, em qualquer categoria
+    const continueWrap = document.getElementById("continue-watching-wrap");
     if (userHistory && userHistory.length > 0) {
-        let historyHtml = `
-            <div class="section-header" style="margin-top: 15px;">
+        continueWrap.innerHTML = `
+            <div class="section-header">
                 <span><i class="fas fa-play" style="color: var(--main-red); margin-right: 5px;"></i> Continuar Assistindo</span>
             </div>
             <div class="horizontal-scroll" id="continue-row">
-        `;
-
-        historyHtml += userHistory.map(h => {
-            const progresso = Math.min((h.nr_tempo_atual / h.nr_tempo_total) * 100, 100);
-            const titulo = h.CONTEUDOS?.nm_titulo || "Desconhecido";
-            const isSerie = h.cd_episodio ? true : false;
-            
-            return `
-                <div class="card-continue" onclick="assistir('${h.cd_conteudo}', '${titulo}', '${h.cd_episodio || ''}')">
-                    <img src="${h.CONTEUDOS?.ds_url_poster}">
-                    <div class="continue-info">
-                        <div class="title">${titulo}</div>
-                        <div class="ep-info">${isSerie ? 'Retomar Série' : 'Retomar Filme'}</div>
-                        <div class="progress-bg">
-                            <div class="progress-bar" style="width: ${progresso}%"></div>
+                ${userHistory.map(h => {
+                    const progresso = Math.min((h.nr_tempo_atual / h.nr_tempo_total) * 100, 100);
+                    const titulo = h.CONTEUDOS?.nm_titulo || "Desconhecido";
+                    const isSerie = h.cd_episodio ? true : false;
+                    return `
+                        <div class="card-continue" onclick="assistir('${h.cd_conteudo}', '${titulo}', '${h.cd_episodio || ''}')">
+                            <img src="${h.CONTEUDOS?.ds_url_poster}">
+                            <div class="continue-info">
+                                <div class="title">${titulo}</div>
+                                <div class="ep-info">${isSerie ? 'Retomar Série' : 'Retomar Filme'}</div>
+                                <div class="progress-bg">
+                                    <div class="progress-bar" style="width: ${progresso}%"></div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            `;
-        }).join("");
-        
-        historyHtml += `</div>`;
-        // Insere logo abaixo do Top 12, não no final da página
-        document.getElementById("top-12-grid").insertAdjacentHTML('afterend', historyHtml);
+                    `;
+                }).join("")}
+            </div>
+        `;
     }
-	
-    // 3. Lógica Blindada de Lançamentos 
-    const lancamentos = [...fullCatalog].sort((a, b) => {
-        const dataA = a.dt_lancamento ? new Date(a.dt_lancamento) : new Date(0);
-        const dataB = b.dt_lancamento ? new Date(b.dt_lancamento) : new Date(0);
-        return dataB - dataA;
-    }).slice(0, 12);
 
-    // 4. Populando as fileiras (Carrosséis menores)
-    renderRow("lançamentos-row", lancamentos, false);
-    renderRow("dublados-row", fullCatalog.filter(i => i.nm_idioma?.toLowerCase().includes("dublado")).slice(0,12), false);
-    
-    // 🚀 INTELIGÊNCIA DA NOVA FILEIRA DE ASIÁTICOS
-    const asiaticos = fullCatalog.filter(i => {
-        const cat = (i.nm_categoria || "").toLowerCase();
-        const gen = (i.ds_generos || "").toLowerCase();
-        return cat.includes("asiat") || gen.includes("asiat") || cat.includes("dorama") || gen.includes("dorama") || cat.includes("corean") || gen.includes("corean");
-    }).slice(0,12);
-    renderRow("asiáticos-row", asiaticos, false);
-
-    renderRow("brasileiras-row", fullCatalog.filter(i => i.ds_generos?.toLowerCase().includes("brasil")).slice(0,12), false);
-    renderRow("short-row", fullCatalog.filter(i => i.nm_categoria === "Short" || i.ds_generos?.includes("Short")).slice(0,12), false);
-    renderRow("masculino-row", fullCatalog.filter(i => i.ds_generos?.toLowerCase().includes("masculino")).slice(0,12), false);
-    
-    const iaAnimes = fullCatalog.filter(i => {
-        const cat = (i.nm_categoria || "").toLowerCase();
-        const gen = (i.ds_generos || "").toLowerCase();
-        return cat.includes("anima") || gen.includes("anima") || cat.includes("ia") || gen.includes("i.a");
-    }).slice(0,12);
-    renderRow("animação-row", iaAnimes, false);
-
-    // "Início" também tem scroll infinito — uma grade de "Mais Títulos" com
-    // tudo que não entrou no Top 12, carregada aos poucos ao rolar a tela.
-    initHomeGridTab('inicio');
+    // Carrega a primeira aba na hora; as demais só quando o usuário entrar nelas
+    initHomeGridTab(HOME_CATEGORY_TABS[0].key);
 
     setupHomeGridObserver();
     setupHomeSwipe();
     setupHomePullToRefresh();
 }
 
-// Troca de aba da Home (clique no botão ou swipe) — "Início" mostra os
-// carrosséis de sempre, as outras mostram uma grade com scroll infinito.
+// Troca de aba da Home (clique no botão ou swipe)
 function switchHomeTab(index) {
     if (index === currentHomeTabIndex || !HOME_CATEGORY_TABS[index]) return;
 
@@ -421,8 +347,7 @@ function switchHomeTab(index) {
         btn.classList.toggle('active', i === index);
     });
 
-    const panelId = target.key === 'inicio' ? 'hometab-inicio' : `hometab-${target.key}`;
-    const panel = document.getElementById(panelId);
+    const panel = document.getElementById(`hometab-${target.key}`);
     if (panel) panel.classList.add('active', direction === 'left' ? 'slide-in-left' : 'slide-in-right');
 
     currentHomeTabIndex = index;
@@ -432,16 +357,13 @@ function switchHomeTab(index) {
     const activeBtn = document.querySelectorAll('#home-tabs-bar .home-tab')[index];
     if (activeBtn) activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
-    if (target.key !== 'inicio') initHomeGridTab(target.key);
+    initHomeGridTab(target.key);
 }
 
 // Inicializa (uma única vez por render da Home) a grade com scroll infinito de uma aba
 function initHomeGridTab(tipo) {
     if (homeGridState[tipo]) return;
-    const items = tipo === 'inicio'
-        ? fullCatalog.filter(i => !(i.rank_top > 0)) // "Mais Títulos" = tudo que não já apareceu no Top 12
-        : filtrarCatalogoPorTitulo(tipo);
-    homeGridState[tipo] = { items, rendered: 0 };
+    homeGridState[tipo] = { items: filtrarCatalogoPorTitulo(tipo), rendered: 0 };
     renderMoreGridItems(tipo);
 }
 
@@ -508,7 +430,7 @@ function setupHomeSwipe() {
     homeEl.addEventListener('touchstart', (e) => {
         touchStartX = e.touches[0].screenX;
         touchStartY = e.touches[0].screenY;
-        swipeBloqueado = !!e.target.closest('.hero-slider, .horizontal-scroll, .apps-bar, .top12-grid, .home-tabs');
+        swipeBloqueado = !!e.target.closest('.horizontal-scroll, .apps-bar, .home-tabs');
     }, { passive: true });
 
     homeEl.addEventListener('touchend', (e) => {
@@ -586,145 +508,6 @@ async function sendHeartbeat(conteudoId = null) {
             })
         });
     } catch (e) { console.log("Erro no heartbeat"); }
-}
-
-function renderTop12(containerId, items) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    if (!items || !items.length) {
-        container.innerHTML = `<div style="grid-column: span 2; text-align: center; color: gray; font-size: 12px;">Em breve...</div>`;
-        return;
-    }
-
-    container.innerHTML = items.map((item, index) => {
-        const rank = index + 1;
-        let badgeClass = 'rank-other';
-        if (rank === 1) badgeClass = 'rank-1';
-        else if (rank === 2) badgeClass = 'rank-2';
-        else if (rank === 3) badgeClass = 'rank-3';
-
-        // 🚀 VERIFICA SE O CLIENTE TEM ACESSO
-        const liberado = isItemUnlocked(item);
-        
-        // 🚀 MUDA A COR E O TEXTO DO BOTÃO DINAMICAMENTE
-        const btnColor = liberado ? "background: #00ff41; color: black;" : "background: white; color: black;";
-        const btnIcon = liberado ? "fa-play" : "fa-dollar-sign";
-        const btnText = liberado ? "ASSISTIR" : "COMPRAR";
-
-        return `
-            <div class="card-top12">
-                <div class="card-top12-img-container">
-                    <img src="${item.ds_url_poster}" loading="lazy" onclick="openMovieDetails('${item.cd_conteudo}')">
-                    <div class="top12-badge ${badgeClass}">${rank}</div>
-                </div>
-                
-                <div class="card-top12-info">
-                    <div class="card-top12-title">${item.nm_titulo}</div>
-                    <div class="card-top12-price">R$ ${precoExibicao(item).toFixed(2).replace('.', ',')}</div>
-                    
-                    <button class="btn-top12-buy" onclick="openMovieDetails('${item.cd_conteudo}')" style="${btnColor}">
-                        <i class="fas ${btnIcon}"></i> ${btnText}
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join("");
-}
-
-// Função auxiliar para não repetir código de cabeçalho
-function generateSectionHTML(id, label) {
-    const displayLabel = label || id;
-    const rowId = id.toLowerCase().replace(' ', '-') + "-row";
-    return `
-        <div class="section-header">
-            <span>${displayLabel}</span>
-            <div class="ver-tudo" onclick="openCategoryPage('${id}')">Ver tudo <i class="fas fa-chevron-right"></i></div>
-        </div>
-        <div class="horizontal-scroll" id="${rowId}"></div>
-    `;
-}
-
-function renderRow(containerId, items, showRank) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    if (!items || !items.length) {
-        container.innerHTML = `<div style="padding: 0 15px; color: gray; font-size: 12px;">Em breve novos conteúdos...</div>`;
-        return;
-    }
-
-    container.innerHTML = items.map(item => {
-        // 🚀 VERIFICA SE O CLIENTE TEM ACESSO (Pinta de verde o de Detalhes também!)
-        const liberado = isItemUnlocked(item);
-        const btnStyle = liberado ? "background: #00ff41; color: black;" : "background: rgba(255, 255, 255, 0.15); color: white;";
-        const btnIcon = liberado ? "fa-play" : "fa-plus";
-        const btnText = liberado ? "ASSISTIR" : "DETALHES";
-
-        return `
-        <div class="card-mini" style="${showRank ? 'margin-left: 20px;' : ''}"> 
-            <div style="position:relative">
-                <img src="${item.ds_url_poster}" 
-                     loading="lazy" 
-                     onclick="openMovieDetails('${item.cd_conteudo}')"
-                     style="cursor: pointer;">
-                
-                ${showRank ? `<div class="rank-number">${item.rank_top}</div>` : ""}
-                ${gerarBadgesTopo(item)}
-            </div>
-            
-            <div class="title">${item.nm_titulo}</div>
-            <div class="price">R$ ${precoExibicao(item).toFixed(2).replace('.', ',')}</div>
-            
-            <button class="btn-buy-small" onclick="openMovieDetails('${item.cd_conteudo}')" style="${btnStyle}">
-                <i class="fas ${btnIcon}"></i> ${btnText}
-            </button>
-        </div>
-        `;
-    }).join("");
-}
-
-// CORRIGIDO: A função agora está fechada corretamente
-function renderSlider(items) {
-  const container = document.getElementById("hero-slider");
-  const dotsContainer = document.getElementById("slider-dots");
-  if (!items.length) return;
-
-  container.innerHTML = items
-    .map(
-      (item) => `
-        <div class="hero-item" style="background-image: url('${item.ds_url_poster}')">
-            <div class="hero-overlay" style="padding-bottom: 28px;">
-                <button class="btn-hero-buy" onclick="openMovieDetails('${item.cd_conteudo}')">
-                    <i class="fas fa-shopping-cart"></i> COMPRAR
-                </button>
-            </div>
-        </div>
-    `,
-    )
-    .join("");
-
-    // Cria as bolinhas (dots)
-  if (dotsContainer) {
-    dotsContainer.innerHTML = items
-      .map((_, i) => `<div class="dot ${i === 0 ? "active" : ""}"></div>`)
-      .join("");
-  }
-
-  // Lógica de rotação automática do slider
-  clearInterval(sliderInterval);
-  let currentIndex = 0;
-  sliderInterval = setInterval(() => {
-    currentIndex = (currentIndex + 1) % items.length;
-    const scrollAmount = container.clientWidth * currentIndex;
-    container.scrollTo({ left: scrollAmount, behavior: "smooth" });
-
-    // Atualiza as bolinhas
-    const dots = document.querySelectorAll(".dot");
-    dots.forEach((dot, index) => {
-      dot.classList.toggle("active", index === currentIndex);
-    });
-  }, 4000); 
 }
 
 // Evita que uma resposta antiga (de um toque anterior, mais lento) sobrescreva
