@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,500&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="style.css?v=4.0" />
+    <link rel="stylesheet" href="style.css?v=4.1" />
 </head>
 <body>
 
@@ -42,6 +42,18 @@
     <!-- Página Inicial (Home) — conteúdo real é montado por renderHome() em script.js assim que o catálogo carrega -->
     <main id="home" class="container active fade-in">
         <div style="padding: 20px 15px; color: var(--text-gray); text-align: center; font-size: 13px;">Carregando catálogo...</div>
+    </main>
+
+    <!-- Continuar Assistindo -->
+    <main id="continuar" class="container fade-in">
+        <div class="section-title" style="padding: 15px; font-weight: bold; font-size: 18px">
+            Continuar Assistindo
+        </div>
+        <div id="continuar-grid" class="grid"></div>
+        <div id="continuar-empty" class="empty-state" style="display: none; text-align: center; margin-top: 50px; color: var(--text-gray);">
+            <i class="fas fa-clock-rotate-left" style="font-size: 40px; margin-bottom: 10px"></i><br />
+            Você ainda não começou a assistir nada.
+        </div>
     </main>
 
     <!-- Minha Lista -->
@@ -327,6 +339,9 @@
         <div class="nav-item active" id="nav-home" onclick="switchTab('home')">
             <i class="fas fa-house"></i><span>HOME</span>
         </div>
+        <div class="nav-item" id="nav-continuar" onclick="switchTab('continuar')">
+            <i class="fas fa-clock-rotate-left"></i><span>CONTINUAR</span>
+        </div>
         <div class="nav-item" id="nav-mylist" onclick="switchTab('mylist')">
             <i class="fas fa-folder-open"></i><span>MINHA LISTA</span>
         </div>
@@ -339,7 +354,7 @@
     </nav>
 
 	<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-    <script src="script.js?v=4.0"></script>
+    <script src="script.js?v=4.1"></script>
 
     <script>
     // Bloqueia clique direito (inspecionar/salvar via menu de contexto)

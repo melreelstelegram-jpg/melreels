@@ -287,43 +287,12 @@ function renderHome() {
     `).join("");
 
     homeContainer.innerHTML = `
-        <div id="continue-watching-wrap"></div>
-
         ${generateAppsBarHTML()}
 
         <div class="home-tabs" id="home-tabs-bar">${tabsHtml}</div>
 
         ${gridPanelsHtml}
     `;
-
-    // 🚀 LÓGICA DO CONTINUAR ASSISTINDO — fixo acima das abas, em qualquer categoria
-    const continueWrap = document.getElementById("continue-watching-wrap");
-    if (userHistory && userHistory.length > 0) {
-        continueWrap.innerHTML = `
-            <div class="section-header">
-                <span><i class="fas fa-play" style="color: var(--main-red); margin-right: 5px;"></i> Continuar Assistindo</span>
-            </div>
-            <div class="horizontal-scroll" id="continue-row">
-                ${userHistory.map(h => {
-                    const progresso = Math.min((h.nr_tempo_atual / h.nr_tempo_total) * 100, 100);
-                    const titulo = h.CONTEUDOS?.nm_titulo || "Desconhecido";
-                    const isSerie = h.cd_episodio ? true : false;
-                    return `
-                        <div class="card-continue" onclick="assistir('${h.cd_conteudo}', '${titulo}', '${h.cd_episodio || ''}')">
-                            <img src="${h.CONTEUDOS?.ds_url_poster}">
-                            <div class="continue-info">
-                                <div class="title">${titulo}</div>
-                                <div class="ep-info">${isSerie ? 'Retomar Série' : 'Retomar Filme'}</div>
-                                <div class="progress-bg">
-                                    <div class="progress-bar" style="width: ${progresso}%"></div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                }).join("")}
-            </div>
-        `;
-    }
 
     // Carrega a primeira aba na hora; as demais só quando o usuário entrar nelas
     initHomeGridTab(HOME_CATEGORY_TABS[0].key);
@@ -1210,6 +1179,40 @@ async function processarCompra(id, titulo, modalidade, valorFinal) {
     _compraEmAndamento = false;
   }
 }
+// Tela dedicada de "Continuar Assistindo" (acessada pela barra de baixo)
+function renderContinuarAssistindo() {
+    const grid = document.getElementById("continuar-grid");
+    const empty = document.getElementById("continuar-empty");
+    if (!grid || !empty) return;
+
+    if (!userHistory || !userHistory.length) {
+        empty.style.display = "block";
+        grid.innerHTML = "";
+        return;
+    }
+
+    empty.style.display = "none";
+    grid.innerHTML = userHistory.map(h => {
+        const progresso = Math.min((h.nr_tempo_atual / h.nr_tempo_total) * 100, 100);
+        const titulo = h.CONTEUDOS?.nm_titulo || "Desconhecido";
+        const isSerie = h.cd_episodio ? true : false;
+        return `
+            <div class="card-premium-list" onclick="assistir('${h.cd_conteudo}', '${titulo}', '${h.cd_episodio || ''}')" style="cursor: pointer;">
+                <img src="${h.CONTEUDOS?.ds_url_poster}">
+                <div class="card-premium-overlay">
+                    <div class="premium-title">${titulo}</div>
+                    <div class="progress-bg" style="margin-bottom: 10px;">
+                        <div class="progress-bar" style="width: ${progresso}%"></div>
+                    </div>
+                    <button class="btn-premium-watch">
+                        <i class="fas fa-play"></i> ${isSerie ? 'RETOMAR SÉRIE' : 'RETOMAR FILME'}
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
 // --- 6. MINHA LISTA E ASSINATURAS ---
 async function loadMyList() {
     const grid = document.getElementById("mylist-grid");
@@ -1564,9 +1567,10 @@ function switchTab(tabId) {
   }
   if (tabId === "mylist") {
       const badge = document.getElementById("badge-novo");
-      if (badge) badge.remove(); 
+      if (badge) badge.remove();
       loadMyList();
   }
+  if (tabId === "continuar") renderContinuarAssistindo();
   if (tabId === "bestsellers") loadPlans();
 }
 function copyPixCode() {

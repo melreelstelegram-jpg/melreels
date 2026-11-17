@@ -698,7 +698,7 @@ header {
 }
 
 /* --- CORREÇÃO MINHA LISTA / RESULTADO DE BUSCA --- */
-#mylist-grid, #search-grid {
+#mylist-grid, #search-grid, #continuar-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr); /* Dois por linha como na imagem */
     gap: 15px;
@@ -976,46 +976,6 @@ body.vip-mode .nav-item.active span {
     margin-bottom: 10px;
 }
 
-/* ==================================================
-   CONTINUAR ASSISTINDO CARD
-   ================================================== */
-.card-continue {
-    min-width: 140px;
-    max-width: 140px;
-    background: #151515;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    cursor: pointer;
-    border: 1px solid rgba(255,255,255,0.05);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.6);
-}
-
-.card-continue img {
-    width: 100%;
-    height: 190px;
-    object-fit: cover;
-    display: block;
-}
-
-.continue-info {
-    padding: 10px;
-}
-
-.continue-info .title {
-    font-size: 11px;
-    font-weight: 800;
-    color: #fff;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.continue-info .ep-info {
-    font-size: 10px;
-    color: #888;
-    margin-top: 4px;
-}
 
 .progress-bg {
     width: 100%;
