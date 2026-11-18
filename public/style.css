@@ -310,13 +310,13 @@ header {
 .horizontal-scroll::-webkit-scrollbar { display: none; }
 
 .card-mini {
-  min-width: 125px;
+  min-width: 0;
   position: relative;
 }
 
 .card-mini img {
-  width: 125px; 
-  height: 185px; 
+  width: 100%;
+  aspect-ratio: 2 / 3;
   object-fit: cover;
   object-position: center; /* Centraliza o corte */
   border-radius: 8px;
